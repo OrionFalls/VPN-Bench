@@ -44,3 +44,31 @@ def test_nat_uses_pinned_uplink(monkeypatch):
 
     assert commands[0][7:9] == ["-o", "eth9"]
     assert commands[1][7:9] == ["-o", "eth9"]
+
+
+def test_kill_switch_uses_explicit_endpoint(monkeypatch):
+    manager = NamespaceManager()
+    commands = []
+
+    monkeypatch.setattr(manager, "_run", lambda args, check=True: (
+        commands.append(args),
+        type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
+    )[1])
+    monkeypatch.setattr(
+        manager,
+        "_resolve_endpoints",
+        lambda endpoints: [("udp", "203.0.113.10", 51820)],
+    )
+
+    ns = type("NS", (), {
+        "name": "vbn-test",
+        "host_ip": "10.250.0.1",
+        "namespace_ip": "10.250.0.2",
+    })()
+    manager.enable_kill_switch(ns, [("vpn.example", 51820, "udp")])
+
+    assert [
+        "ip", "netns", "exec", "vbn-test", "iptables", "-A", "OUTPUT",
+        "-p", "udp", "-d", "203.0.113.10", "--dport", "51820", "-j", "ACCEPT",
+    ] in commands
+    assert commands[-1][-2:] == ["-j", "DROP"]
