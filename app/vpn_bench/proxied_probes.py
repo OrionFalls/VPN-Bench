@@ -9,6 +9,8 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
+from .throughput import download_sample
+
 
 @dataclass(frozen=True)
 class ProxyProbeResult:
@@ -70,6 +72,8 @@ def run_proxy_probe(
     dns_domain: str = "example.com",
     attempts: int = 5,
     timeout: float = 8.0,
+    throughput_url: str | None = None,
+    throughput_duration_seconds: float = 0.0,
 ) -> ProxyProbeResult:
     latency_samples: list[float] = []
     failures = 0
@@ -88,6 +92,14 @@ def run_proxy_probe(
         timeout=timeout,
     )
     http_ok, http_latency, http_status = http_head(target, proxy_url, timeout)
+    throughput = None
+    if throughput_url and throughput_duration_seconds > 0:
+        throughput = download_sample(
+            throughput_url,
+            proxy_url,
+            duration_seconds=throughput_duration_seconds,
+            timeout=max(timeout, throughput_duration_seconds + 4),
+        )
 
     median = statistics.median(latency_samples) if latency_samples else None
     jitter = (
@@ -112,5 +124,6 @@ def run_proxy_probe(
             "target": target,
             "attempts": attempts,
             "latency_samples_ms": latency_samples,
+            "throughput": throughput,
         },
     )
