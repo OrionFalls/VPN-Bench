@@ -9,7 +9,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
-from .throughput import download_sample
+from .throughput import download_sample, upload_sample
 
 
 @dataclass(frozen=True)
@@ -108,6 +108,7 @@ def run_proxy_probe(
     attempts: int = 5,
     timeout: float = 8.0,
     throughput_url: str | None = None,
+    throughput_upload_url: str | None = None,
     throughput_duration_seconds: float = 0.0,
     whitelist_targets: list[str] | None = None,
     whitelist_baseline: list[dict[str, Any]] | None = None,
@@ -164,6 +165,13 @@ def run_proxy_probe(
             duration_seconds=throughput_duration_seconds,
             timeout=max(timeout, throughput_duration_seconds + 4),
         )
+    upload = None
+    if throughput_upload_url and throughput_duration_seconds > 0:
+        upload = upload_sample(
+            throughput_upload_url,
+            proxy_url,
+            timeout=max(timeout, throughput_duration_seconds + 4),
+        )
 
     median = statistics.median(latency_samples) if latency_samples else None
     jitter = (
@@ -189,6 +197,7 @@ def run_proxy_probe(
             "attempts": attempts,
             "latency_samples_ms": latency_samples,
             "throughput": throughput,
+            "upload": upload,
             "whitelist": whitelist_results,
             "whitelist_ok": whitelist_ok,
             "whitelist_baseline": whitelist_baseline or [],
