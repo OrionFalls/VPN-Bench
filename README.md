@@ -53,7 +53,7 @@ VPN-Bench предназначен для автоматического сра�
 
 Архитектура специально не привязана к одному ядру.
 
-> **Runtime по умолчанию: только LX + Extended. Xray не входит в базовый Docker image и подключается как optional compatibility backend.**
+> **Runtime по умолчанию: LX + Extended + изолированный WireGuard adapter. Xray не входит в базовый Docker image и подключается как optional compatibility backend.**
 
 | Ядро | Назначение | Runtime |
 |---|---|---|
@@ -66,7 +66,7 @@ LX становится основным runtime-ядром. Отдельный 
 
 Extended оставляем как специализированный fallback для протоколов и функций, которые выходят за пределы обычной sing-box/LX-модели. Xray — последний compatibility fallback.
 
-**Runtime-цепочка: LX → Extended → optional Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
+**Runtime-цепочка: LX → Extended → WireGuard adapter → optional Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
 
 ## Импорт подписок
 
