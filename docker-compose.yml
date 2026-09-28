@@ -32,6 +32,8 @@ services:
       VPN_BENCH_WORKER_TOKEN: ${VPN_BENCH_WORKER_TOKEN}
       VPN_BENCH_CONFIG: /app/config/config.yaml
       VPN_BENCH_NETWORK_NAMESPACE: ${VPN_BENCH_NETWORK_NAMESPACE:-1}
+    volumes:
+      - ./config:/app/config:ro
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
