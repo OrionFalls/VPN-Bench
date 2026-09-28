@@ -1,0 +1,333 @@
+:root{
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color:#172033;
+  background:#f5f7fb;
+  color-scheme:light;
+  --bg:#f5f7fb;
+  --surface:#fff;
+  --surface-soft:#f8faff;
+  --line:#e4e8f0;
+  --line-soft:#edf0f5;
+  --text:#172033;
+  --muted:#748199;
+  --muted-2:#98a3b6;
+  --blue:#3478f6;
+  --blue-dark:#246df3;
+  --nav:#172033;
+  --nav-hover:#263653;
+  --nav-muted:#aebbd0;
+  --success:#238447;
+  --success-bg:#edf7ef;
+  --danger:#e5484d;
+  --radius:16px;
+  --shadow:0 8px 28px rgba(22,32,51,.055);
+}
+*{box-sizing:border-box}
+html{min-width:320px;background:var(--bg)}
+body{margin:0;min-width:320px;background:var(--bg);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit}
+button{touch-action:manipulation}
+.shell{min-height:100vh}
+.side{
+  width:240px;
+  background:var(--nav);
+  color:#dce4f2;
+  padding:22px 14px;
+  position:fixed;
+  inset:0 auto 0 0;
+  z-index:20;
+  display:flex;
+  flex-direction:column;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:38px;
+  padding:0 10px 26px;
+  font-weight:800;
+  font-size:18px;
+  letter-spacing:-.02em;
+}
+.brand-mark{color:var(--blue)}
+.brand-name{color:#f4f7fc}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{
+  display:flex;
+  align-items:center;
+  gap:11px;
+  width:100%;
+  min-height:42px;
+  border:0;
+  background:transparent;
+  color:var(--nav-muted);
+  text-align:left;
+  padding:10px 12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:14px;
+  transition:background .16s ease,color .16s ease,transform .16s ease;
+}
+.nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav button.active{background:var(--nav-hover);color:#fff}
+.nav-icon{width:20px;text-align:center;flex:0 0 20px;font-size:16px;opacity:.95}
+.bottom{margin-top:auto;padding:18px 10px 2px;color:#8290a8;font-size:12px}
+.main{
+  margin-left:240px;
+  width:calc(100% - 240px);
+  min-height:100vh;
+  padding:32px clamp(20px,3vw,42px);
+}
+#app{width:100%;max-width:1440px;margin:0 auto}
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:20px;
+  margin-bottom:24px;
+}
+.top h1{
+  margin:0 0 6px;
+  font-size:clamp(25px,2.4vw,34px);
+  line-height:1.1;
+  letter-spacing:-.035em;
+}
+.muted{color:var(--muted);font-size:14px;line-height:1.45}
+.card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:20px;
+  box-shadow:var(--shadow);
+}
+.card h3{margin:0 0 14px;font-size:18px;letter-spacing:-.015em}
+.grid{display:grid;gap:16px}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.stats .card{
+  min-height:132px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.stats .card strong{
+  display:block;
+  margin:7px 0 2px;
+  font-size:30px;
+  line-height:1;
+  letter-spacing:-.035em;
+}
+.stats .card .muted{font-size:13px}
+.row{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(360px,1fr);gap:16px;margin-top:16px}
+.progress{height:9px;background:#e9edf5;border-radius:99px;overflow:hidden}
+.bar{height:100%;background:var(--blue);border-radius:99px;transition:width .25s ease}
+.btn{
+  border:0;
+  background:var(--blue-dark);
+  color:#fff;
+  min-height:40px;
+  padding:9px 15px;
+  border-radius:10px;
+  font-weight:650;
+  cursor:pointer;
+  transition:transform .12s ease,filter .12s ease,box-shadow .12s ease;
+}
+.btn:hover{filter:brightness(.97);box-shadow:0 4px 12px rgba(36,109,243,.18)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.btn.secondary{background:#eef3fb;color:#315078}
+.btn.danger{background:var(--danger)}
+.input,select{
+  width:100%;
+  min-height:40px;
+  border:1px solid #d4dbe7;
+  border-radius:10px;
+  padding:9px 12px;
+  background:#fff;
+  color:var(--text);
+  outline:none;
+}
+.input:focus,select:focus{border-color:#7ea9fb;box-shadow:0 0 0 3px rgba(52,120,246,.11)}
+.table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+.table th,.table td{
+  text-align:left;
+  padding:12px 9px;
+  border-bottom:1px solid var(--line-soft);
+  vertical-align:middle;
+}
+.table th{color:#66748c;font-weight:650;font-size:12px}
+.table tr:last-child td{border-bottom:0}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  min-height:25px;
+  padding:4px 9px;
+  border-radius:99px;
+  background:var(--success-bg);
+  color:var(--success);
+  font-size:11px;
+  font-weight:650;
+  white-space:nowrap;
+}
+.empty{padding:38px 20px;text-align:center;color:#8490a4}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mode{
+  border:2px solid #e2e7ef;
+  border-radius:13px;
+  padding:16px;
+  cursor:pointer;
+  transition:border-color .15s ease,background .15s ease;
+}
+.mode:hover{border-color:#b7c8e8}
+.mode.selected{border-color:var(--blue);background:#f6f9ff}
+.checktree{
+  max-height:420px;
+  overflow:auto;
+  border:1px solid #e2e7ef;
+  border-radius:10px;
+  padding:10px;
+  background:#fbfcfe;
+}
+.providerline{font-weight:700;padding:9px 5px}
+.serverline{padding:8px 5px 8px 22px}
+.serverline label{display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+.serverline input{margin-top:3px}
+.filter{display:flex;gap:8px;margin:7px 0}
+.filter input{flex:1}
+#screening-status,#test-status{min-width:0}
+#screening-status>br,#test-status>br{display:block;content:"";margin-top:10px}
+
+/* Keep the inline layout hints in app.js useful on large screens, but make
+   generated forms fluid instead of allowing them to overflow narrow cards. */
+.card [style*="grid-template-columns"]{min-width:0}
+.card [style*="display:flex"]{min-width:0}
+.card [style*="display:flex"]>*{min-width:0}
+
+/* Tablet */
+@media (max-width:1100px){
+  .side{width:210px}
+  .main{margin-left:210px;width:calc(100% - 210px);padding:26px 22px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .row{grid-template-columns:1fr}
+}
+
+/* Phone: replace the desktop rail with a compact, horizontally scrollable
+   header. This is deliberately a full-width layout rather than a shrunken
+   desktop sidebar. */
+@media (max-width:700px){
+  html,body{overflow-x:hidden}
+  .shell{display:block}
+  .side{
+    position:sticky;
+    top:0;
+    inset:auto;
+    width:100%;
+    height:auto;
+    min-height:0;
+    padding:10px 12px 8px;
+    background:rgba(23,32,51,.98);
+    box-shadow:0 4px 18px rgba(10,18,32,.16);
+  }
+  .brand{
+    min-height:34px;
+    padding:0 4px 8px;
+    font-size:17px;
+  }
+  .brand-mark{font-size:16px}
+  .nav{
+    flex-direction:row;
+    gap:5px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding:1px 0 3px;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+  }
+  .nav::-webkit-scrollbar{display:none}
+  .nav button{
+    flex:0 0 auto;
+    width:auto;
+    min-height:36px;
+    padding:7px 10px;
+    gap:7px;
+    border-radius:9px;
+    font-size:12px;
+    white-space:nowrap;
+  }
+  .nav-icon{width:auto;flex:0 0 auto;font-size:13px}
+  .bottom{display:none}
+  .main{
+    margin:0;
+    width:100%;
+    min-height:calc(100vh - 88px);
+    padding:20px 14px 34px;
+  }
+  #app{max-width:none}
+  .top{
+    margin-bottom:17px;
+    gap:10px;
+  }
+  .top h1{font-size:28px;line-height:1.05}
+  .muted{font-size:13px}
+  .card{
+    border-radius:14px;
+    padding:16px;
+    box-shadow:0 5px 20px rgba(22,32,51,.045);
+  }
+  .stats{
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .stats .card{
+    min-height:104px;
+    justify-content:flex-start;
+    padding:15px;
+  }
+  .stats .card strong{font-size:27px;margin-top:9px}
+  .stats .card .muted{font-size:12px}
+  .row,.cards{grid-template-columns:1fr}
+  .row{gap:12px;margin-top:12px}
+  .cards{gap:10px}
+  .table{
+    display:block;
+    overflow-x:auto;
+    white-space:nowrap;
+    -webkit-overflow-scrolling:touch;
+  }
+  .table th,.table td{padding:10px 8px}
+  .checktree{max-height:300px}
+  .filter{align-items:stretch}
+  .btn{min-height:42px}
+  .card [style*="grid-template-columns:1fr 1fr"]{
+    grid-template-columns:1fr !important;
+  }
+  .card [style*="display:flex;justify-content:space-between"]{
+    flex-wrap:wrap;
+    gap:6px;
+  }
+}
+
+/* Small phones */
+@media (max-width:430px){
+  .side{padding-left:9px;padding-right:9px}
+  .brand{padding-left:3px;padding-bottom:7px}
+  .nav button{font-size:11px;padding:7px 9px}
+  .main{padding:17px 10px 28px}
+  .top h1{font-size:25px}
+  .stats{grid-template-columns:1fr;gap:9px}
+  .stats .card{min-height:88px}
+  .stats .card strong{font-size:26px}
+  .card{padding:14px}
+}
+
+/* Respect devices with a home indicator when the navigation becomes the
+   scrolling header. */
+@supports (padding: max(0px)){
+  @media (max-width:700px){
+    .side{padding-top:max(10px,env(safe-area-inset-top))}
+    .main{padding-bottom:max(28px,env(safe-area-inset-bottom))}
+  }
+}
