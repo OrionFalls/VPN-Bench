@@ -346,7 +346,7 @@ def build_app(config: Config) -> FastAPI:
                     import json
                     connection.execute(
                         "INSERT INTO test_results(run_id,server_id,started_at,duration_seconds,success,latency_ms,jitter_ms,"
-                        "packet_loss_percent,download_mbps,upload_mbps,dns_ok,http_ok,details_json) "
+                        "packet_loss_percent,download_mbps,upload_mbps,dns_ok,http_ok,whitelist_ok,details_json) "
                         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
@@ -357,10 +357,11 @@ def build_app(config: Config) -> FastAPI:
                             result["latency_ms"],
                             result["jitter_ms"],
                             result["packet_loss_percent"],
-                            None,
+                            (result.get("details", {}).get("throughput") or {}).get("mbps"),
                             None,
                             int(result["dns_ok"]) if result["dns_ok"] is not None else None,
                             int(result["http_ok"]) if result["http_ok"] is not None else None,
+                            (1 if result.get("details", {}).get("whitelist_ok") else 0) if result.get("details", {}).get("whitelist") else None,
                             json.dumps(result["details"], ensure_ascii=False),
                         ),
                     )
@@ -393,7 +394,7 @@ def build_app(config: Config) -> FastAPI:
         with db() as connection:
             rows = connection.execute(
                 "SELECT id, server_id, started_at, duration_seconds, success, latency_ms, jitter_ms, "
-                "packet_loss_percent, download_mbps, upload_mbps, dns_ok, http_ok, details_json "
+                "packet_loss_percent, download_mbps, upload_mbps, dns_ok, http_ok, whitelist_ok, details_json "
                 "FROM test_results WHERE run_id = ? ORDER BY id",
                 (run_id,),
             ).fetchall()
