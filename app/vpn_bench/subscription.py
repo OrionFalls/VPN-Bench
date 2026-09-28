@@ -1,7 +1,7 @@
 """Subscription fetching and normalization.
 
-This module does not establish VPN connections. It only turns common
-subscription formats into the application's normalized server model.
+This module does not establish VPN connections. It turns common subscription
+formats into the application's normalized server model.
 """
 
 from __future__ import annotations
@@ -13,10 +13,30 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
-from uuid import uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, uuid5
 
 
-SUPPORTED_SCHEMES = {"vless","vmess","trojan","ss","hysteria2","hy2","tuic","anytls","ssh","socks5","socks","naive+https","naive+quic","wireguard","awg","masque"}
+SUPPORTED_SCHEMES = {
+    "vless",
+    "vmess",
+    "trojan",
+    "ss",
+    "shadowsocks",
+    "hysteria2",
+    "hy2",
+    "tuic",
+    "anytls",
+    "ssh",
+    "socks5",
+    "socks",
+    "naive+https",
+    "naive+quic",
+    "naive",
+    "wireguard",
+    "awg",
+    "amneziawg",
+    "masque",
+}
 
 
 @dataclass(frozen=True)
@@ -45,8 +65,12 @@ def fetch_subscription(url: str, timeout: float = 20.0) -> tuple[str, dict[str, 
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read(4 * 1024 * 1024)
+            body = response.read(4 * 1024 * 1024 + 1)
+            if len(body) > 4 * 1024 * 1024:
+                raise SubscriptionError("Subscription is larger than the 4 MiB limit")
             headers = {k.lower(): v for k, v in response.headers.items()}
+    except SubscriptionError:
+        raise
     except Exception as exc:
         raise SubscriptionError(f"Unable to fetch subscription: {exc}") from exc
     return body.decode("utf-8-sig", errors="replace"), headers
@@ -57,7 +81,6 @@ def decode_subscription(text: str) -> str:
     if not cleaned:
         return ""
 
-    # A JSON/sing-box document should remain JSON.
     if cleaned.startswith("{") or cleaned.startswith("["):
         return cleaned
 
@@ -71,7 +94,6 @@ def decode_subscription(text: str) -> str:
         decoded = base64.b64decode(padded, validate=True).decode("utf-8-sig")
     except Exception:
         return cleaned
-
     return decoded.strip() or cleaned
 
 
@@ -95,13 +117,13 @@ def parse_subscription(text: str) -> list[ImportedServer]:
         server = parse_uri(line)
         if server:
             result.append(server)
-
     return result
 
 
 def parse_uri(uri: str) -> ImportedServer | None:
     if uri.lower().startswith("vmess://"):
         return _parse_vmess_uri(uri)
+
     parsed = urllib.parse.urlsplit(uri)
     scheme = parsed.scheme.lower()
     if scheme not in SUPPORTED_SCHEMES:
@@ -118,23 +140,22 @@ def parse_uri(uri: str) -> ImportedServer | None:
 
     if scheme == "vless":
         transport = transport or "tcp"
-        security = security or _first(query, "security")
     elif scheme == "trojan":
         transport = transport or "tcp"
         security = security or "tls"
     elif scheme in {"hysteria2", "hy2"}:
         transport = transport or "udp"
         security = security or "tls"
-    elif scheme == "ss":
+    elif scheme in {"ss", "shadowsocks"}:
         transport = transport or "tcp"
     elif scheme in {"socks5", "socks"}:
         transport = transport or "tcp"
-    elif scheme in {"anytls", "naive+https", "naive+quic"}:
+    elif scheme in {"anytls", "naive", "naive+https", "naive+quic"}:
         transport = transport or ("quic" if scheme == "naive+quic" else "tcp")
         security = security or "tls"
     elif scheme == "ssh":
         transport = transport or "tcp"
-    elif scheme in {"wireguard", "awg"}:
+    elif scheme in {"wireguard", "awg", "amneziawg"}:
         transport = transport or "udp"
     elif scheme == "masque":
         transport = transport or "quic"
@@ -148,7 +169,12 @@ def parse_uri(uri: str) -> ImportedServer | None:
         port=port,
         transport=transport,
         security=security,
-        raw={"uri": uri, "query": query, "username": username, "password": password},
+        raw={
+            "uri": uri,
+            "query": query,
+            "username": username,
+            "password": password,
+        },
     )
 
 
@@ -180,13 +206,18 @@ def parse_json(data: Any) -> list[ImportedServer]:
     if isinstance(data, dict) and isinstance(data.get("outbounds"), list):
         return _parse_sing_box_outbounds(data["outbounds"])
 
+    if isinstance(data, dict) and isinstance(data.get("endpoints"), list):
+        return _parse_sing_box_endpoints(data["endpoints"])
+
     if isinstance(data, list):
-        result = []
+        result: list[ImportedServer] = []
         for item in data:
             if isinstance(item, str):
                 parsed = parse_uri(item)
                 if parsed:
                     result.append(parsed)
+            elif isinstance(item, dict):
+                result.extend(_parse_sing_box_outbounds([item]))
         return result
 
     raise SubscriptionError("Unsupported JSON subscription format")
@@ -194,36 +225,88 @@ def parse_json(data: Any) -> list[ImportedServer]:
 
 def _parse_sing_box_outbounds(outbounds: list[Any]) -> list[ImportedServer]:
     result: list[ImportedServer] = []
+    supported_json_types = {
+        "vless", "vmess", "trojan", "shadowsocks", "ss", "hysteria2",
+        "tuic", "anytls", "socks", "http", "naive", "wireguard",
+    }
     for index, item in enumerate(outbounds):
         if not isinstance(item, dict):
             continue
         protocol = str(item.get("type", "")).lower()
-        if protocol not in SUPPORTED_SCHEMES:
+        if protocol not in supported_json_types:
             continue
+
         host = item.get("server")
         port = _safe_int(item.get("server_port"))
         tls = item.get("tls") if isinstance(item.get("tls"), dict) else {}
         transport_data = item.get("transport") if isinstance(item.get("transport"), dict) else {}
         transport = transport_data.get("type")
+        if protocol in {"hysteria2", "tuic"} and not transport:
+            transport = "udp"
+        if protocol == "naive" and not transport:
+            transport = "quic" if item.get("quic") else "tcp"
+        if protocol in {"wireguard"} and not transport:
+            transport = "udp"
+
         security = "tls" if tls.get("enabled") else None
         name = str(item.get("tag") or host or f"Server {index + 1}")
+        raw = dict(item)
         result.append(
             ImportedServer(
                 id=_server_id(json.dumps(item, sort_keys=True)),
                 name=name,
-                protocol="hysteria2" if protocol == "hy2" else protocol,
+                protocol=_normalize_protocol(protocol),
                 host=str(host) if host else None,
                 port=port,
                 transport=str(transport) if transport else None,
                 security=security,
-                raw=item,
+                raw=raw,
+            )
+        )
+    return result
+
+
+def _parse_sing_box_endpoints(endpoints: list[Any]) -> list[ImportedServer]:
+    result: list[ImportedServer] = []
+    for index, item in enumerate(endpoints):
+        if not isinstance(item, dict):
+            continue
+        endpoint_type = str(item.get("type", "")).lower()
+        if endpoint_type not in {"wireguard", "amnezia_wg", "amneziawg"}:
+            continue
+        peers = item.get("peers")
+        peer = peers[0] if isinstance(peers, list) and peers and isinstance(peers[0], dict) else {}
+        host = peer.get("server") or peer.get("address") or item.get("server")
+        port = _safe_int(peer.get("server_port") or item.get("server_port") or 51820)
+        raw = dict(item)
+        raw["peer"] = peer
+        result.append(
+            ImportedServer(
+                id=_server_id(json.dumps(item, sort_keys=True)),
+                name=str(item.get("tag") or host or f"Endpoint {index + 1}"),
+                protocol="amneziawg" if "amnezia" in endpoint_type else "wireguard",
+                host=str(host) if host else None,
+                port=port,
+                transport="udp",
+                security=None,
+                raw=raw,
             )
         )
     return result
 
 
 def _normalize_protocol(scheme: str) -> str:
-    return {"hy2":"hysteria2","ss":"shadowsocks","socks":"socks5","naive+https":"naiveproxy","naive+quic":"naiveproxy","awg":"amneziawg"}.get(scheme, scheme)
+    return {
+        "hy2": "hysteria2",
+        "ss": "shadowsocks",
+        "shadowsocks": "shadowsocks",
+        "socks": "socks5",
+        "naive": "naiveproxy",
+        "naive+https": "naiveproxy",
+        "naive+quic": "naiveproxy",
+        "awg": "amneziawg",
+        "amneziawg": "amneziawg",
+    }.get(scheme, scheme)
 
 
 def _server_id(value: str) -> str:
