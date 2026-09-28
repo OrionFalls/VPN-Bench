@@ -101,3 +101,14 @@ def test_naiveproxy_uri_builds_tls():
     assert outbound["type"] == "naive"
     assert outbound["tls"]["enabled"] is True
     assert outbound["quic"] is False
+
+
+def test_ssh_uri_builds_native_outbound():
+    from vpn_bench.adapters.singbox import build_config
+
+    config = build_config("ssh://user:pass@example.com:22")
+    outbound = config["outbounds"][0]
+
+    assert outbound["type"] == "ssh"
+    assert outbound["user"] == "user"
+    assert outbound["password"] == "pass"
