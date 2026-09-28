@@ -162,8 +162,27 @@ def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str,
     elif scheme == "ss":
         outbound["method"] = username
         outbound["password"] = password
-    else:
+    elif scheme in {"hysteria2", "hy2", "anytls"}:
         outbound["password"] = username or password
+    elif scheme == "tuic":
+        outbound["uuid"] = username
+        outbound["password"] = password
+        if query.get("congestion_control"):
+            outbound["congestion_control"] = query["congestion_control"][0]
+        if query.get("udp_relay_mode"):
+            outbound["udp_relay_mode"] = query["udp_relay_mode"][0]
+    elif scheme in {"socks5", "socks"}:
+        outbound["type"] = "socks"
+        outbound["version"] = "5"
+        if username:
+            outbound["username"] = username
+        if password:
+            outbound["password"] = password
+    elif scheme in {"naive+https", "naive+quic"}:
+        outbound["type"] = "naive"
+        outbound["username"] = username
+        outbound["password"] = password
+        outbound["quic"] = scheme == "naive+quic"
 
     _apply_tls(outbound, query, parsed.hostname)
     _apply_transport(outbound, query, allow_extended_transports)
