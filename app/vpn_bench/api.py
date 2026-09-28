@@ -368,7 +368,7 @@ def build_app(config: Config) -> FastAPI:
                             result["jitter_ms"],
                             result["packet_loss_percent"],
                             (result.get("details", {}).get("throughput") or {}).get("mbps"),
-                            None,
+                            (result.get("details", {}).get("upload") or {}).get("mbps"),
                             int(result["dns_ok"]) if result["dns_ok"] is not None else None,
                             int(result["http_ok"]) if result["http_ok"] is not None else None,
                             (
