@@ -89,9 +89,13 @@ class ScreeningCampaignManager:
             stop_event = threading.Event()
             self._stop_events[run_id] = stop_event
 
+        plan_for_run = self.plan
+        with self._lock:
+            self._plans[run_id] = plan_for_run
+
         threading.Thread(
             target=self._run,
-            args=(state, stop_event, servers, on_result, on_finish),
+            args=(state, stop_event, servers, on_result, on_finish, plan_for_run),
             daemon=True,
             name=f"vpn-bench-screening-{run_id}",
         ).start()
@@ -120,9 +124,8 @@ class ScreeningCampaignManager:
         with self._lock:
             return {key: list(value) for key, value in self._samples.get(run_id, {}).items()}
 
-    def _run(self, state, stop_event, servers, on_result, on_finish) -> None:
+    def _run(self, state, stop_event, servers, on_result, on_finish, plan: ScreeningPlan) -> None:
         all_ids = list(servers)
-        plan = self._plans.get(state.run_id, self.plan)
         try:
             survivors = all_ids
             for pass_no in range(1, plan.repeat_passes + 1):
