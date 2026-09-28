@@ -35,6 +35,8 @@ class ScreeningState:
             "current_server_id": self.current_server_id,
             "completed_servers": self.completed_servers,
             "shortlisted_servers": list(self.shortlisted_servers),
+            "shortlist_count": len(self.shortlisted_servers),
+            "shortlist": list(self.shortlisted_servers),
             "failed_servers": self.failed_servers,
             "elapsed_seconds": round(max(0.0, elapsed), 1),
             "progress": round(
