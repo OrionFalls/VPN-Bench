@@ -73,6 +73,15 @@ if ! curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "Running privileged namespace self-test..."
+if ! docker compose run --rm vpn-bench-worker python -m vpn_bench.runtime_selftest; then
+  echo "VPN-Bench namespace self-test failed."
+  echo "The worker requires NET_ADMIN/SYS_ADMIN and /dev/net/tun."
+  docker compose ps
+  docker compose logs --tail=80 vpn-bench-worker
+  exit 1
+fi
+
 VM_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 VM_IP="${VM_IP:-127.0.0.1}"
 
