@@ -44,6 +44,7 @@ class NamespaceManager:
         self._lock = threading.Lock()
         self._counter = 0
         self._names: set[str] = set()
+        self._subnets: set[str] = set()
 
     def create(self, job_id: str) -> NetworkNamespace:
         self._require_commands()
@@ -54,8 +55,20 @@ class NamespaceManager:
 
         # /30 per namespace: network, worker side, namespace side, broadcast.
         subnet_size = 4
-        subnet_index = index % (self.base.num_addresses // subnet_size)
-        network_int = int(self.base.network_address) + subnet_index * subnet_size
+        subnet_count = self.base.num_addresses // subnet_size
+        with self._lock:
+            selected_index = None
+            for offset in range(subnet_count):
+                candidate_index = (index + offset) % subnet_count
+                network_int = int(self.base.network_address) + candidate_index * subnet_size
+                candidate = str(ipaddress.ip_network((network_int, 30)))
+                if candidate not in self._subnets:
+                    selected_index = candidate_index
+                    self._subnets.add(candidate)
+                    break
+        if selected_index is None:
+            raise NamespaceError("Namespace address pool is exhausted")
+        network_int = int(self.base.network_address) + selected_index * subnet_size
         subnet = ipaddress.ip_network((network_int, 30))
         addresses = list(subnet.hosts())
         host_ip, namespace_ip = str(addresses[0]), str(addresses[1])
@@ -114,6 +127,7 @@ class NamespaceManager:
             pass
         with self._lock:
             self._names.discard(ns.name)
+            self._subnets.discard(ns.subnet)
 
     def exec_prefix(self, ns: NetworkNamespace) -> list[str]:
         return ["ip", "netns", "exec", ns.name]
