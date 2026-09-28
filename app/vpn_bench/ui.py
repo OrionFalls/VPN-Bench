@@ -59,6 +59,7 @@ async function analytics(){var rows=await api("/api/v1/analytics");var body=rows
 function logs(){app.innerHTML=head("Логи","Технические события и диагностика")+'<div class="card"><div class="empty">Логи подключения и worker будут выведены сюда после добавления централизованного event stream.</div></div>'}
 function placeholder(t,s){app.innerHTML=head(t,s)+'<div class="card"><div class="empty">Этот раздел уже заложен в структуру приложения. Реальные данные появятся после подключения движка измерений.</div></div>'}
 function settings(){app.innerHTML=head("Настройки","Хранение, сеть, безопасность и обновления")+'<div class="grid" style="grid-template-columns:1fr 1fr"><div class="card"><h3>Безопасность</h3><p class="muted">Смена пароля администратора.</p><button class="btn secondary">Изменить пароль</button></div><div class="card"><h3>Система</h3><p>Версия <b>0.2.0</b></p><p class="muted">Проверка обновлений и обновление приложения.</p><button class="btn secondary">Проверить обновления</button></div><div class="card"><h3>Хранение</h3><p class="muted">Срок хранения результатов и очистка старых измерений.</p></div><div class="card"><h3>Сеть</h3><p class="muted">DNS, IPv4/IPv6 и тестовые endpoints.</p></div></div>'}
+nav();
 boot();
 </script></body></html>"""
 
