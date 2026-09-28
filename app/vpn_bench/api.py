@@ -170,12 +170,7 @@ def build_app(config: Config) -> FastAPI:
                 "SELECT id, name, display_name, enabled, metadata_json, last_updated_at, created_at "
                 "FROM providers ORDER BY COALESCE(display_name, name)"
             ).fetchall()
-        return [
-            dict(row)
-            | {"metadata": json_loads(row["metadata_json"])}
-            | {"capabilities": [item.__dict__ for item in detect_capabilities(row["protocol"], row["transport"])]}
-            for row in rows
-        ]
+        return [dict(row) | {"metadata": json_loads(row["metadata_json"])} for row in rows]
 
     @app.post("/api/v1/providers")
     def add_provider(payload: ProviderRequest, _: str = Depends(require_auth)) -> dict:
@@ -258,7 +253,12 @@ def build_app(config: Config) -> FastAPI:
                 "SELECT id, provider, provider_id, name, protocol, host, port, transport, security, metadata_json "
                 "FROM servers ORDER BY provider, name"
             ).fetchall()
-        return [dict(row) | {"metadata": json_loads(row["metadata_json"])} for row in rows]
+        return [
+            dict(row)
+            | {"metadata": json_loads(row["metadata_json"])}
+            | {"capabilities": [item.__dict__ for item in detect_capabilities(row["protocol"], row["transport"])]}
+            for row in rows
+        ]
 
     @app.get("/api/v1/filters")
     def filters(scope: str = "test", _: str = Depends(require_auth)) -> list[dict]:
