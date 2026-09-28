@@ -110,7 +110,11 @@ class SingBoxAdapter(VPNAdapter):
             proxy_host = namespace.namespace_ip if namespace else "127.0.0.1"
             if _port_open(proxy_host, proxy_port):
                 if namespace and self.namespace_manager:
-                    self.namespace_manager.enable_kill_switch(namespace)
+                    endpoint_protocol = _upstream_protocol(uri)
+                    self.namespace_manager.enable_kill_switch(
+                        namespace,
+                        [(str(server["host"]), int(server["port"]), endpoint_protocol)],
+                    )
                 return ConnectionHandle(
                     server_id=str(server["id"]),
                     metadata={
@@ -288,6 +292,16 @@ def _vmess_config(uri: str) -> dict[str, Any]:
         _apply_tls(outbound, query, server.host)
     _apply_transport(outbound, query, allow_extended_transports=True)
     return _base_config(outbound)
+
+
+def _upstream_protocol(uri: str) -> str:
+    parsed = urlsplit(uri)
+    scheme = parsed.scheme.lower()
+    query = parse_qs(parsed.query)
+    transport = (query.get("type", query.get("network", ["tcp"]))[0] or "tcp").lower()
+    if scheme in {"hysteria2", "hy2", "tuic", "naive+quic"} or transport == "quic":
+        return "udp"
+    return "tcp"
 
 
 def _base_config(outbound: dict[str, Any]) -> dict[str, Any]:
