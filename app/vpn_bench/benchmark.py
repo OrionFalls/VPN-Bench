@@ -37,14 +37,12 @@ class BenchmarkEngine:
             binary=os.environ.get("VPN_BENCH_XRAY", "xray")
         )
 
-    def _adapter_for(self, server: dict[str, Any]):
+    def _adapters_for(self, server: dict[str, Any]):
         transport = str(server.get("transport") or "").lower()
         protocol = str(server.get("protocol") or "").lower()
-        if transport == "xhttp":
-            return self.extended_adapter
-        if protocol in {"masque", "mieru", "trusttunnel", "ssh", "tuic", "anytls"}:
-            return self.extended_adapter
-        return self.singbox_adapter
+        if transport == "xhttp" or protocol in {"masque", "mieru", "trusttunnel", "ssh", "tuic", "anytls"}:
+            return (self.extended_adapter, self.lx_adapter, self.xray_adapter)
+        return (self.singbox_adapter, self.lx_adapter, self.extended_adapter, self.xray_adapter)
 
     def run_server(
         self,
@@ -56,9 +54,19 @@ class BenchmarkEngine:
         started = time.time()
         handle = None
         last_success = False
-        adapter = self._adapter_for(server)
+        adapters = self._adapters_for(server)
+        adapter = None
+        connect_errors: list[str] = []
         try:
-            handle = adapter.connect(server)
+            for candidate in adapters:
+                try:
+                    handle = candidate.connect(server)
+                    adapter = candidate
+                    break
+                except Exception as exc:
+                    connect_errors.append(f"{candidate.__class__.__name__}: {exc}")
+            if handle is None or adapter is None:
+                raise RuntimeError("All compatible VPN cores failed: " + " | ".join(connect_errors))
             proxy_url = str(handle.metadata["proxy_url"])
             while not stop_event.is_set():
                 elapsed = time.time() - started
