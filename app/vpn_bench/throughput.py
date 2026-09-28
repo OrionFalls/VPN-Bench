@@ -86,7 +86,7 @@ def upload_sample(
             response.read(1)
             elapsed = max(0.001, time.perf_counter() - started)
             return {
-                "ok": 200 <= response.status < 500,
+                "ok": 200 <= response.status < 400,
                 "mbps": round(size_bytes * 8 / elapsed / 1_000_000, 3),
                 "bytes": size_bytes,
                 "duration_seconds": round(elapsed, 3),
