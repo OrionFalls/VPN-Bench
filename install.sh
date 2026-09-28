@@ -5,18 +5,23 @@ REPO="https://github.com/OrionFalls/VPN-Bench.git"
 INSTALL_DIR="${VPN_BENCH_DIR:-/opt/vpn-bench}"
 
 if [[ "${EUID}" -ne 0 ]]; then
-  echo "Run as root: curl ... | sudo bash"
+  echo "Run as root."
   exit 1
 fi
 
-command -v git >/dev/null 2>&1 || {
-  apt-get update
-  apt-get install -y git ca-certificates
-}
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y ca-certificates git curl
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is not installed. Install Docker Engine first."
-  echo "See: https://docs.docker.com/engine/install/"
+  echo "Installing Docker Engine..."
+  curl -fsSL https://get.docker.com | sh
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose plugin is unavailable."
+  echo "Install the Docker Compose plugin and rerun this installer."
   exit 1
 fi
 
