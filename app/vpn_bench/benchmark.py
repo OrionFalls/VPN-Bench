@@ -64,6 +64,11 @@ class BenchmarkEngine:
                     protocol = "shadowsocks"
                 elif protocol in {"hy2", "hysteria2"}:
                     protocol = "hysteria2"
+        # AmneziaWG is exposed by the sing-box-lx userspace endpoint,
+        # but its normalized configuration is handled by WireGuardAdapter.
+        if protocol == "amneziawg":
+            return (self.wireguard_adapter,)
+
         names = preferred_cores(protocol, transport)
         adapters = {
             "sing-box-lx": self.lx_adapter,
