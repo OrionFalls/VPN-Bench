@@ -108,4 +108,10 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
 
 
 def preferred_cores(protocol: str | None, transport: str | None) -> tuple[str, ...]:
-    return tuple(item.core for item in detect_capabilities(protocol, transport) if item.supported)
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in detect_capabilities(protocol, transport):
+        if item.supported and item.core not in seen:
+            seen.add(item.core)
+            result.append(item.core)
+    return tuple(result)
