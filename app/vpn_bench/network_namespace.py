@@ -54,7 +54,7 @@ class NamespaceManager:
         subnet_size = 4
         subnet_index = index % (self.base.num_addresses // subnet_size)
         network_int = int(self.base.network_address) + subnet_index * subnet_size
-        subnet = ipaddress.ip_network((network_int, self.base.prefixlen + 2))
+        subnet = ipaddress.ip_network((network_int, 30))
         addresses = list(subnet.hosts())
         host_ip, namespace_ip = str(addresses[0]), str(addresses[1])
 
