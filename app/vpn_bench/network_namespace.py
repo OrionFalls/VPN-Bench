@@ -147,71 +147,26 @@ class NamespaceManager:
         ])
 
     def _upstream_peers(self, ns: NetworkNamespace) -> list[tuple[str, str, int]]:
-        result = self._run([
-            "ip", "netns", "exec", ns.name, "ss", "-H", "-n", "-t", "-u",
-        ], check=False)
         peers: set[tuple[str, str, int]] = set()
-        for line in result.stdout.splitlines():
-            fields = line.split()
-            if len(fields) < 5:
-                continue
-            state = fields[0]
-            local = fields[3]
-            remote = fields[4]
-            if remote in {"*", "*:*", "0.0.0.0:*", "[::]:*"}:
-                continue
-            parsed = _parse_peer(remote)
-            if parsed is None:
-                continue
-            protocol = "udp" if "udp" in line.lower() else "tcp"
-            address, port = parsed
-            if address in {ns.host_ip, ns.namespace_ip, "127.0.0.1"}:
-                continue
-            peers.add((protocol, address, port))
+        for protocol in ("tcp", "udp"):
+            result = self._run([
+                "ip", "netns", "exec", ns.name, "ss", "-H", "-n", f"-{protocol[0]}",
+            ], check=False)
+            for line in result.stdout.splitlines():
+                fields = line.split()
+                if len(fields) < 5:
+                    continue
+                remote = fields[4]
+                if remote in {"*", "*:*", "0.0.0.0:*", "[::]:*"}:
+                    continue
+                parsed = _parse_peer(remote)
+                if parsed is None:
+                    continue
+                address, port = parsed
+                if address in {ns.host_ip, ns.namespace_ip, "127.0.0.1"}:
+                    continue
+                peers.add((protocol, address, port))
         return sorted(peers)
-
-    def _add_nat(self, ns: NetworkNamespace) -> None:
-        uplink = ns.uplink
-        self._run([
-            "iptables", "-t", "nat", "-A", "POSTROUTING",
-            "-s", ns.subnet, "-o", uplink, "-j", "MASQUERADE",
-        ])
-
-    def _delete_nat(self, ns: NetworkNamespace) -> None:
-        uplink = ns.uplink
-        self._run([
-            "iptables", "-t", "nat", "-D", "POSTROUTING",
-            "-s", ns.subnet, "-o", uplink, "-j", "MASQUERADE",
-        ], check=False)
-
-    def _enable_forwarding(self) -> None:
-        self._run(["sysctl", "-w", "net.ipv4.ip_forward=1"], check=False)
-
-    def _default_interface(self) -> str:
-        result = self._run(["ip", "route", "show", "default"])
-        match = re.search(r"\bdev\s+(\S+)", result.stdout)
-        if not match:
-            raise NamespaceError("Could not determine worker default network interface")
-        return match.group(1)
-
-    @staticmethod
-    def _require_commands() -> None:
-        for command in ("ip", "iptables", "sysctl"):
-            if not _which(command):
-                raise NamespaceError(f"Required command not found: {command}")
-
-    @staticmethod
-    def _run(args: list[str], check: bool = True) -> subprocess.CompletedProcess[str]:
-        try:
-            result = subprocess.run(args, capture_output=True, text=True, timeout=10)
-        except OSError as exc:
-            raise NamespaceError(f"Failed to execute {' '.join(args)}: {exc}") from exc
-        if check and result.returncode != 0:
-            raise NamespaceError(
-                f"Command failed ({result.returncode}): {' '.join(args)}: "
-                f"{result.stderr.strip() or result.stdout.strip()}"
-            )
-        return result
 
 
 def _parse_peer(value: str) -> tuple[str, int] | None:
