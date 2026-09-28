@@ -211,12 +211,20 @@ def build_app(config: Config) -> FastAPI:
         metadata = _subscription_metadata(headers)
         now = utc_now()
         with db() as connection:
-            connection.execute("DELETE FROM servers WHERE provider_id = ?", (provider_id,))
+            connection.execute(
+                "UPDATE servers SET active = 0 WHERE provider_id = ?",
+                (provider_id,),
+            )
             for server in imported:
                 import json
                 connection.execute(
-                    "INSERT INTO servers(id, provider_id, provider, name, protocol, host, port, transport, security, metadata_json) "
-                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO servers(id, provider_id, provider, name, protocol, host, port, transport, security, metadata_json, active, last_seen_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(id) DO UPDATE SET "
+                    "provider_id=excluded.provider_id, provider=excluded.provider, name=excluded.name, "
+                    "protocol=excluded.protocol, host=excluded.host, port=excluded.port, "
+                    "transport=excluded.transport, security=excluded.security, metadata_json=excluded.metadata_json, "
+                    "active=1, last_seen_at=excluded.last_seen_at",
                     (
                         server.id,
                         provider_id,
@@ -228,6 +236,8 @@ def build_app(config: Config) -> FastAPI:
                         server.transport,
                         server.security,
                         json.dumps(server.raw, ensure_ascii=False),
+                        1,
+                        now,
                     ),
                 )
             connection.execute(
@@ -246,8 +256,8 @@ def build_app(config: Config) -> FastAPI:
     def servers(_: str = Depends(require_auth)) -> list[dict]:
         with db() as connection:
             rows = connection.execute(
-                "SELECT id, provider, provider_id, name, protocol, host, port, transport, security, metadata_json "
-                "FROM servers ORDER BY provider, name"
+                "SELECT id, provider, provider_id, name, protocol, host, port, transport, security, active, last_seen_at, metadata_json "
+                "FROM servers ORDER BY active DESC, provider, name"
             ).fetchall()
         return [
             dict(row)
