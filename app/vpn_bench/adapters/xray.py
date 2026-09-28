@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from ..network_namespace import NamespaceManager
+
 from .base import ConnectionHandle, VPNAdapter
 
 
@@ -25,6 +27,7 @@ class XrayAdapter(VPNAdapter):
         self.binary = binary
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        self.namespace_manager = NamespaceManager()
 
     def import_servers(self, source: str):
         from ..subscription import parse_subscription
@@ -51,6 +54,8 @@ class XrayAdapter(VPNAdapter):
 
         config = build_config(uri)
         proxy_port = _free_port()
+        namespace = self.namespace_manager.create(str(server["id"]))
+        config["inbounds"][0]["listen"] = namespace.namespace_ip
         config["inbounds"][0]["port"] = proxy_port
 
         directory = Path(tempfile.mkdtemp(prefix="vpn-bench-xray-", dir=self.work_dir))
@@ -59,8 +64,21 @@ class XrayAdapter(VPNAdapter):
         config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
         log_file = log_path.open("w", encoding="utf-8")
 
+        command_prefix = self.namespace_manager.exec_prefix(namespace)
+        check = subprocess.run(
+            command_prefix + [self.binary, "run", "-test", "-config", str(config_path)],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if check.returncode != 0:
+            log_file.close()
+            shutil.rmtree(directory, ignore_errors=True)
+            self.namespace_manager.destroy(namespace)
+            raise XrayError(f"Xray rejected config: {check.stderr.strip() or check.stdout.strip()}")
+
         process = subprocess.Popen(
-            [self.binary, "run", "-c", str(config_path)],
+            command_prefix + [self.binary, "run", "-c", str(config_path)],
             stdout=log_file,
             stderr=subprocess.STDOUT,
             cwd=directory,
@@ -71,16 +89,22 @@ class XrayAdapter(VPNAdapter):
                 detail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
                 log_file.close()
                 shutil.rmtree(directory, ignore_errors=True)
+                self.namespace_manager.destroy(namespace)
                 raise XrayError(f"Xray exited during startup: {detail}")
-            if _port_open("127.0.0.1", proxy_port):
+            if _port_open(namespace.namespace_ip, proxy_port):
+                self.namespace_manager.enable_kill_switch(
+                    namespace,
+                    [(str(server["host"]), int(server["port"]), "tcp")],
+                )
                 return ConnectionHandle(
                     server_id=str(server["id"]),
                     metadata={
                         "process": process,
-                        "proxy_url": f"http://127.0.0.1:{proxy_port}",
-                        "socks_url": f"socks5://127.0.0.1:{proxy_port}",
+                        "proxy_url": f"http://{namespace.namespace_ip}:{proxy_port}",
+                        "socks_url": f"socks5://{namespace.namespace_ip}:{proxy_port}",
                         "directory": str(directory),
                         "log_file": log_file,
+                        "namespace": namespace,
                     },
                 )
             time.sleep(0.1)
@@ -105,6 +129,9 @@ class XrayAdapter(VPNAdapter):
         directory = handle.metadata.get("directory")
         if directory:
             shutil.rmtree(directory, ignore_errors=True)
+        namespace = handle.metadata.get("namespace")
+        if namespace:
+            self.namespace_manager.destroy(namespace)
 
 
 def build_config(uri: str) -> dict[str, Any]:
