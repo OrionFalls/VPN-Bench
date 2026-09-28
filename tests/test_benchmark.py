@@ -14,7 +14,7 @@ class FakeAdapter:
 
 def test_engine_connects_probes_and_disconnects(monkeypatch):
     engine = BenchmarkEngine(probe_interval_seconds=2)
-    engine.adapter = FakeAdapter()
+    engine.singbox_adapter = FakeAdapter()
     monkeypatch.setattr(
         "vpn_bench.benchmark.run_proxy_probe",
         lambda *args, **kwargs: ProxyProbeResult(
