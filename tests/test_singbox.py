@@ -51,3 +51,27 @@ def test_extended_uri_schemes_are_normalized():
         "naive+https://user:pass@example.com:443#naive"
     )
     assert [item.protocol for item in items] == ["tuic", "anytls", "ssh", "socks5", "naiveproxy"]
+
+
+
+def test_tuic_config():
+    uri = "tuic://00000000-0000-0000-0000-000000000001:secret@example.com:443?congestion_control=bbr&udp_relay_mode=native#test"
+    outbound = build_config(uri, allow_extended_transports=True)["outbounds"][0]
+    assert outbound["type"] == "tuic"
+    assert outbound["uuid"].endswith("0001")
+    assert outbound["congestion_control"] == "bbr"
+
+
+def test_anytls_config():
+    uri = "anytls://secret@example.com:443?security=tls&sni=example.com#test"
+    outbound = build_config(uri, allow_extended_transports=True)["outbounds"][0]
+    assert outbound["type"] == "anytls"
+    assert outbound["password"] == "secret"
+
+
+def test_naive_config():
+    uri = "naive+https://user:secret@example.com:443#test"
+    outbound = build_config(uri, allow_extended_transports=True)["outbounds"][0]
+    assert outbound["type"] == "naive"
+    assert outbound["username"] == "user"
+    assert outbound["password"] == "secret"
