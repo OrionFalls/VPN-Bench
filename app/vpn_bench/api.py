@@ -217,7 +217,15 @@ def build_app(config: Config) -> FastAPI:
             )
             for server in imported:
                 import json
-                server_id = uuid5(NAMESPACE_URL, f"{provider_id}:{server.id}").hex
+                existing = connection.execute(
+                    "SELECT provider_id FROM servers WHERE id = ?",
+                    (server.id,),
+                ).fetchone()
+                server_id = (
+                    server.id
+                    if not existing or existing["provider_id"] == provider_id
+                    else uuid5(NAMESPACE_URL, f"{provider_id}:{server.id}").hex
+                )
                 connection.execute(
                     "INSERT INTO servers(id, provider_id, provider, name, protocol, host, port, transport, security, metadata_json, active, last_seen_at) "
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
