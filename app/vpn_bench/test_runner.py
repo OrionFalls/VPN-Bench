@@ -156,7 +156,12 @@ class TestRunManager:
                 state.message = f"Testing {state.current_server_name}"
 
                 if on_server is not None:
-                    allocation = slot_seconds if state.scheduling_mode == "equal_time" else max(0.0, state.planned_seconds - state.elapsed_seconds)\n                    success = on_server(server_id, allocation, stop_event)
+                    allocation = (
+                        slot_seconds
+                        if state.scheduling_mode == "equal_time"
+                        else max(0.0, state.planned_seconds - state.elapsed_seconds)
+                    )
+                    success = on_server(server_id, allocation, stop_event)
                 else:
                     success = self._wait_slot(stop_event, slot_seconds)
 
