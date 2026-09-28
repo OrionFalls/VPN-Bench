@@ -72,3 +72,21 @@ def test_kill_switch_uses_explicit_endpoint(monkeypatch):
         "-p", "udp", "-d", "203.0.113.10", "--dport", "51820", "-j", "ACCEPT",
     ] in commands
     assert commands[-1][-2:] == ["-j", "DROP"]
+
+
+def test_kill_switch_allows_explicit_tunnel_interface(monkeypatch):
+    manager = NamespaceManager()
+    commands = []
+    monkeypatch.setattr(manager, "_run", lambda args, check=True: commands.append(args))
+    monkeypatch.setattr(
+        manager,
+        "_resolve_endpoints",
+        lambda endpoints: [("udp", "203.0.113.10", 51820)],
+    )
+    ns = type("NS", (), {"name": "vbn-test", "host_ip": "10.250.0.1", "namespace_ip": "10.250.0.2"})()
+    manager.enable_kill_switch(ns, [("vpn.example", 51820, "udp")], interfaces=["wg0"])
+    assert [
+        "ip", "netns", "exec", "vbn-test", "iptables", "-A", "OUTPUT",
+        "-o", "wg0", "-j", "ACCEPT",
+    ] in commands
+    assert commands[-1][-2:] == ["-j", "DROP"]
