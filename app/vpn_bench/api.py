@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,12 +12,20 @@ from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from .config import Config
+from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
 from .test_runner import TestRunManager
 
 
 SESSION_DAYS = 7
+
+
+def encrypt_subscription_url(url: str) -> str:
+    key = os.environ.get("VPN_BENCH_SECRET")
+    if not key:
+        raise RuntimeError("VPN_BENCH_SECRET is not configured")
+    return Fernet(key.encode()).encrypt(url.encode()).decode()
 
 
 def utc_now() -> str:
@@ -134,7 +143,7 @@ def build_app(config: Config) -> FastAPI:
                     provider_id,
                     payload.name,
                     payload.display_name,
-                    payload.subscription_url,
+                    encrypt_subscription_url(payload.subscription_url),
                     int(payload.enabled),
                     utc_now(),
                 ),
