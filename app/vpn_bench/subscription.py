@@ -112,6 +112,8 @@ def parse_uri(uri: str) -> ImportedServer | None:
     port = parsed.port
     transport = _first(query, "type") or _first(query, "network")
     security = _first(query, "security")
+    username = urllib.parse.unquote(parsed.username or "")
+    password = urllib.parse.unquote(parsed.password or "")
 
     if scheme == "vless":
         transport = transport or "tcp"
@@ -133,7 +135,7 @@ def parse_uri(uri: str) -> ImportedServer | None:
         port=port,
         transport=transport,
         security=security,
-        raw={"uri": uri, "query": query},
+        raw={"uri": uri, "query": query, "username": username, "password": password},
     )
 
 
