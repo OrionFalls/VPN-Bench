@@ -64,6 +64,7 @@ class ScreeningCampaignManager:
         self._stop_events: dict[str, threading.Event] = {}
         self._samples: dict[str, list[dict[str, Any]]] = {}
         self._lock = threading.RLock()
+        self._plans: dict[str, ScreeningPlan] = {}
 
     def start(
         self,
@@ -84,6 +85,7 @@ class ScreeningCampaignManager:
                 message="Screening pass 1 started.",
             )
             self._states[run_id] = state
+            self._plans[run_id] = self.plan
             stop_event = threading.Event()
             self._stop_events[run_id] = stop_event
 
@@ -120,13 +122,14 @@ class ScreeningCampaignManager:
 
     def _run(self, state, stop_event, servers, on_result, on_finish) -> None:
         all_ids = list(servers)
+        plan = self._plans.get(state.run_id, self.plan)
         try:
             survivors = all_ids
-            for pass_no in range(1, self.plan.repeat_passes + 1):
+            for pass_no in range(1, plan.repeat_passes + 1):
                 if stop_event.is_set():
                     break
                 state.current_pass = pass_no
-                candidates = self.plan.next_candidates(all_ids, survivors)
+                candidates = plan.next_candidates(all_ids, survivors)
                 state.pass_total = len(candidates)
                 state.pass_completed = 0
                 state.message = f"Screening pass {pass_no}: {len(candidates)} servers."
@@ -149,7 +152,7 @@ class ScreeningCampaignManager:
 
                     ok = self.worker.run_server(
                         servers[server_id],
-                        self.plan.first_pass_duration if pass_no == 1 else self.plan.repeat_pass_duration,
+                        plan.first_pass_duration if pass_no == 1 else plan.repeat_pass_duration,
                         stop_event,
                         on_result=receive,
                     )
@@ -199,3 +202,4 @@ class ScreeningCampaignManager:
         finally:
             with self._lock:
                 self._stop_events.pop(state.run_id, None)
+                self._plans.pop(state.run_id, None)
