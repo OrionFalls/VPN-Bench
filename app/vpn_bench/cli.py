@@ -7,7 +7,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="VPN-Bench")
     parser.add_argument(
         "--config",
-        default="/app/config/config.example.yaml",
+        default="/app/config/config.yaml",
         help="Path to YAML configuration",
     )
     return parser
