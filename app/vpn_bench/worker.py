@@ -28,13 +28,13 @@ class Worker:
         config_path = os.environ.get("VPN_BENCH_CONFIG", "/app/config/config.yaml")
         config = load_config(config_path)
         self.engine = BenchmarkEngine(
-            probe_interval_seconds=config.probe_interval_seconds,
-            http_targets=list(config.http_targets),
-            dns_domain=config.dns_domain,
-            throughput_download_url=config.throughput_download_url,
-            throughput_upload_url=config.throughput_upload_url,
-            throughput_sample_seconds=config.throughput_sample_seconds,
-            whitelist_targets=list(config.whitelist_targets),
+            probe_interval_seconds=config.benchmark.probe_interval_seconds,
+            http_targets=list(config.benchmark.http_targets),
+            dns_domain=config.benchmark.dns_domain,
+            throughput_download_url=config.benchmark.throughput_download_url,
+            throughput_upload_url=config.benchmark.throughput_upload_url,
+            throughput_sample_seconds=config.benchmark.throughput_sample_seconds,
+            whitelist_targets=list(config.benchmark.whitelist_targets),
         )
         self.jobs: dict[str, dict] = {}
         self.stop_events: dict[str, threading.Event] = {}
