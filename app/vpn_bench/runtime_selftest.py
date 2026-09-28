@@ -80,7 +80,7 @@ def main() -> int:
                 "python",
                 "-c",
                 "import socket; s=socket.socket(); s.settimeout(.5); "
-                "s.connect_ex(('1.1.1.1', 443)) == 0 and raise SystemExit(2)",
+                "rc=s.connect_ex(('1.1.1.1', 443)); raise SystemExit(2 if rc == 0 else 0)"",
             ],
             check=False,
         )
