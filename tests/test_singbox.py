@@ -1,7 +1,7 @@
 from vpn_bench.adapters.singbox import build_config
 
 
-def test_vless_reality_xhttp_is_rejected_by_upstream_singbox():
+def test_xhttp_requires_extended_transport():
     uri = (
         "vless://00000000-0000-0000-0000-000000000001@example.com:443"
         "?type=xhttp&security=reality&sni=example.com&pbk=publickey&sid=1234#test"
@@ -44,10 +44,10 @@ from vpn_bench.subscription import parse_subscription
 
 def test_extended_uri_schemes_are_normalized():
     items = parse_subscription(
-        "tuic://00000000-0000-0000-0000-000000000001:pass@example.com:443#tuic\\n"
-        "anytls://pass@example.com:443#anytls\\n"
-        "ssh://user:pass@example.com:22#ssh\\n"
-        "socks5://user:pass@example.com:1080#socks\\n"
+        "tuic://00000000-0000-0000-0000-000000000001:pass@example.com:443#tuic\n"
+        "anytls://pass@example.com:443#anytls\n"
+        "ssh://user:pass@example.com:22#ssh\n"
+        "socks5://user:pass@example.com:1080#socks\n"
         "naive+https://user:pass@example.com:443#naive"
     )
     assert [item.protocol for item in items] == ["tuic", "anytls", "ssh", "socks5", "naiveproxy"]
