@@ -6,7 +6,7 @@ import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, status
 from fastapi.responses import HTMLResponse
@@ -217,6 +217,7 @@ def build_app(config: Config) -> FastAPI:
             )
             for server in imported:
                 import json
+                server_id = uuid5(NAMESPACE_URL, f"{provider_id}:{server.id}").hex
                 connection.execute(
                     "INSERT INTO servers(id, provider_id, provider, name, protocol, host, port, transport, security, metadata_json, active, last_seen_at) "
                     "VALUES(?,?,?,?,?,?,?,?,?,?,?,?) "
@@ -226,7 +227,7 @@ def build_app(config: Config) -> FastAPI:
                     "transport=excluded.transport, security=excluded.security, metadata_json=excluded.metadata_json, "
                     "active=1, last_seen_at=excluded.last_seen_at",
                     (
-                        server.id,
+                        server_id,
                         provider_id,
                         provider_name,
                         server.name,
