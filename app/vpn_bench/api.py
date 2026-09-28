@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from .config import Config
 from .capabilities import detect_capabilities
-from .benchmark import BenchmarkEngine
+from .worker_client import WorkerClient
 from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
@@ -84,11 +84,7 @@ class FilterRequest(BaseModel):
 def build_app(config: Config) -> FastAPI:
     initialize(config.app.database)
     manager = TestRunManager()
-    engine = BenchmarkEngine(
-        probe_interval_seconds=config.benchmark.probe_interval_seconds,
-        http_targets=list(config.benchmark.http_targets),
-        dns_domain=config.benchmark.dns_domain,
-    )
+    worker = WorkerClient(poll_interval=max(0.5, min(2.0, config.benchmark.probe_interval_seconds / 4)))
     app = FastAPI(title="VPN-Bench API", version=config.app.version)
 
     def db() -> sqlite3.Connection:
@@ -369,7 +365,7 @@ def build_app(config: Config) -> FastAPI:
                         ),
                     )
 
-            return engine.run_server(
+            return worker.run_server(
                 server_data[server_id],
                 allocation,
                 stop_event,
