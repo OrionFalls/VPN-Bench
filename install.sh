@@ -46,6 +46,9 @@ if [[ ! -f .env ]]; then
   WORKER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
   printf 'VPN_BENCH_SECRET=%s\nVPN_BENCH_WORKER_TOKEN=%s\nVPN_BENCH_NETWORK_NAMESPACE=1\n' "${SECRET}" "${WORKER_TOKEN}" > .env
 else
+  if ! grep -q '^VPN_BENCH_SECRET=' .env; then
+    printf '\nVPN_BENCH_SECRET=%s\n' "$(python3 -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')" >> .env
+  fi
   if ! grep -q '^VPN_BENCH_WORKER_TOKEN=' .env; then
     printf '\nVPN_BENCH_WORKER_TOKEN=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env
   fi
