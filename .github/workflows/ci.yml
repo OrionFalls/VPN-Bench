@@ -28,6 +28,18 @@ jobs:
       - name: Validate UI JavaScript
         run: node --check app/vpn_bench/static/app.js
 
+      - name: Validate wheel assets
+        run: |
+          pip install build
+          python -m build --wheel
+          python - <<'PY'
+          import glob
+          import zipfile
+          wheel = glob.glob("dist/*.whl")[-1]
+          with zipfile.ZipFile(wheel) as z:
+              assert any(name.startswith("vpn_bench/static/") for name in z.namelist())
+          PY
+
   docker:
     runs-on: ubuntu-latest
     steps:
