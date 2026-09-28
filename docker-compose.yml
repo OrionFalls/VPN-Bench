@@ -4,7 +4,7 @@ services:
     container_name: vpn-bench
     restart: unless-stopped
     environment:
-      VPN_BENCH_CONFIG: /app/config/config.example.yaml
+      VPN_BENCH_CONFIG: /app/config/config.yaml
       VPN_BENCH_DATA_DIR: /app/data
     volumes:
       - ./config:/app/config:ro
