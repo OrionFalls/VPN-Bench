@@ -28,12 +28,18 @@ def main() -> int:
     port = listener.getsockname()[1]
 
     accepted = threading.Event()
+    accepted_count = 0
+    accepted_lock = threading.Lock()
 
-    def accept_once() -> None:
+    def accept_twice() -> None:
+        nonlocal accepted_count
         try:
-            conn, _ = listener.accept()
-            with conn:
-                conn.recv(1)
+            for _ in range(2):
+                conn, _ = listener.accept()
+                with conn:
+                    conn.recv(1)
+                with accepted_lock:
+                    accepted_count += 1
             accepted.set()
         finally:
             listener.close()
@@ -52,7 +58,7 @@ def main() -> int:
             f"import socket; s=socket.create_connection(({ns.host_ip!r}, {port}), 1); s.send(b'x'); s.close()",
         )
         if not accepted.wait(2):
-            raise NamespaceError("Namespace could not reach worker-side veth")
+            raise NamespaceError("Namespace could not reach worker-side veth twice")
 
         # Once the kill switch is active, only the explicitly allowed endpoint,
         # established connections, and loopback are permitted.
