@@ -101,6 +101,8 @@ def parse_subscription(text: str) -> list[ImportedServer]:
 
 
 def parse_uri(uri: str) -> ImportedServer | None:
+    if uri.lower().startswith("vmess://"):
+        return _parse_vmess_uri(uri)
     parsed = urllib.parse.urlsplit(uri)
     scheme = parsed.scheme.lower()
     if scheme not in SUPPORTED_SCHEMES:
@@ -136,6 +138,30 @@ def parse_uri(uri: str) -> ImportedServer | None:
         transport=transport,
         security=security,
         raw={"uri": uri, "query": query, "username": username, "password": password},
+    )
+
+
+def _parse_vmess_uri(uri: str) -> ImportedServer | None:
+    encoded = uri.split("://", 1)[1]
+    try:
+        padded = encoded + "=" * (-len(encoded) % 4)
+        data = json.loads(base64.b64decode(padded).decode("utf-8"))
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict) or not data.get("add"):
+        return None
+    transport = str(data.get("net") or "tcp").lower()
+    security = "tls" if str(data.get("tls") or "").lower() == "tls" else None
+    name = str(data.get("ps") or data.get("add"))
+    return ImportedServer(
+        id=_server_id(uri),
+        name=name,
+        protocol="vmess",
+        host=str(data["add"]),
+        port=_safe_int(data.get("port")),
+        transport=transport,
+        security=security,
+        raw=data,
     )
 
 
