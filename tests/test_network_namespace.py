@@ -42,5 +42,5 @@ def test_nat_uses_pinned_uplink(monkeypatch):
     manager._add_nat(ns)
     manager._delete_nat(ns)
 
-    assert commands[0][8:10] == ["-o", "eth9"]
-    assert commands[1][8:10] == ["-o", "eth9"]
+    assert commands[0][7:9] == ["-o", "eth9"]
+    assert commands[1][7:9] == ["-o", "eth9"]
