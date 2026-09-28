@@ -198,6 +198,50 @@ class NamespaceManager:
                 peers.add((protocol, address, port))
         return sorted(peers)
 
+    def _require_commands(self) -> None:
+        missing = [cmd for cmd in ("ip", "iptables", "sysctl") if not _which(cmd)]
+        if missing:
+            raise NamespaceError(f"Missing namespace commands: {', '.join(missing)}")
+
+    def _default_interface(self) -> str:
+        result = self._run(["ip", "route", "show", "default"], check=False)
+        for line in result.stdout.splitlines():
+            fields = line.split()
+            if "dev" in fields:
+                index = fields.index("dev")
+                if index + 1 < len(fields):
+                    return fields[index + 1]
+        raise NamespaceError("Could not determine worker uplink interface")
+
+    def _run(self, args: list[str], check: bool = True):
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if check and result.returncode != 0:
+            raise NamespaceError(
+                result.stderr.strip() or result.stdout.strip() or
+                f"Command failed: {' '.join(args)}"
+            )
+        return result
+
+    def _enable_forwarding(self) -> None:
+        self._run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
+
+    def _add_nat(self, ns: NetworkNamespace) -> None:
+        self._run([
+            "iptables", "-t", "nat", "-A", "POSTROUTING",
+            "-s", ns.subnet, "-o", ns.uplink, "-j", "MASQUERADE",
+        ])
+
+    def _delete_nat(self, ns: NetworkNamespace) -> None:
+        self._run([
+            "iptables", "-t", "nat", "-D", "POSTROUTING",
+            "-s", ns.subnet, "-o", ns.uplink, "-j", "MASQUERADE",
+        ], check=False)
+
 
 def _parse_peer(value: str) -> tuple[str, int] | None:
     value = value.strip()
