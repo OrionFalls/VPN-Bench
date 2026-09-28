@@ -127,11 +127,23 @@ def parse_uri(uri: str) -> ImportedServer | None:
         security = security or "tls"
     elif scheme == "ss":
         transport = transport or "tcp"
+    elif scheme in {"socks5", "socks"}:
+        transport = transport or "tcp"
+    elif scheme in {"anytls", "naive+https", "naive+quic"}:
+        transport = transport or ("quic" if scheme == "naive+quic" else "tcp")
+        security = security or "tls"
+    elif scheme == "ssh":
+        transport = transport or "tcp"
+    elif scheme in {"wireguard", "awg"}:
+        transport = transport or "udp"
+    elif scheme == "masque":
+        transport = transport or "quic"
+        security = security or "tls"
 
     return ImportedServer(
         id=_server_id(uri),
         name=name,
-        protocol="hysteria2" if scheme == "hy2" else scheme,
+        protocol=_normalize_protocol(scheme),
         host=host,
         port=port,
         transport=transport,
@@ -208,6 +220,10 @@ def _parse_sing_box_outbounds(outbounds: list[Any]) -> list[ImportedServer]:
             )
         )
     return result
+
+
+def _normalize_protocol(scheme: str) -> str:
+    return {"hy2":"hysteria2","ss":"shadowsocks","socks":"socks5","naive+https":"naiveproxy","naive+quic":"naiveproxy","awg":"amneziawg"}.get(scheme, scheme)
 
 
 def _server_id(value: str) -> str:
