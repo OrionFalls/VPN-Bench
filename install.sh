@@ -41,10 +41,10 @@ fi
 
 if [[ ! -f .env ]]; then
   echo "Generating application encryption secret..."
-  SECRET="$(python3 -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')"
+  SECRET="$(python3 -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())' )"
+  WORKER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))' )"
   umask 077
-  printf 'VPN_BENCH_SECRET=%s
-' "${SECRET}" > .env
+  printf 'VPN_BENCH_SECRET=%s\nVPN_BENCH_WORKER_TOKEN=%s\n' "${SECRET}" "${WORKER_TOKEN}" > .env
 fi
 
 chmod 600 .env
