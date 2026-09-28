@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from .adapters.singbox import SingBoxAdapter
+from .adapters.xray import XrayAdapter
 from .proxied_probes import run_proxy_probe
 
 
@@ -22,9 +23,18 @@ class BenchmarkEngine:
         self.probe_interval_seconds = max(2, probe_interval_seconds)
         self.http_targets = http_targets or ["https://example.com/"]
         self.dns_domain = dns_domain
-        self.adapter = SingBoxAdapter(
+        self.singbox_adapter = SingBoxAdapter(
             binary=os.environ.get("VPN_BENCH_SING_BOX", "sing-box")
         )
+        self.xray_adapter = XrayAdapter(
+            binary=os.environ.get("VPN_BENCH_XRAY", "xray")
+        )
+
+    def _adapter_for(self, server: dict[str, Any]):
+        transport = str(server.get("transport") or "").lower()
+        if transport == "xhttp":
+            return self.xray_adapter
+        return self.singbox_adapter
 
     def run_server(
         self,
@@ -36,8 +46,9 @@ class BenchmarkEngine:
         started = time.time()
         handle = None
         last_success = False
+        adapter = self._adapter_for(server)
         try:
-            handle = self.adapter.connect(server)
+            handle = adapter.connect(server)
             proxy_url = str(handle.metadata["proxy_url"])
             while not stop_event.is_set():
                 elapsed = time.time() - started
@@ -88,4 +99,4 @@ class BenchmarkEngine:
             return False
         finally:
             if handle is not None:
-                self.adapter.disconnect(handle)
+                adapter.disconnect(handle)
