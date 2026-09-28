@@ -40,7 +40,7 @@ VPN-Bench предназначен для автоматического сра�
 - SQLite для результатов и журналов;
 - реальные DNS/HTTP/TCP-пробы через VPN proxy;
 - измерение latency, jitter и packet loss;
-- изолированный запуск VPN-ядра;
+- отдельный privileged worker для запуска VPN-ядер;\n- controller без NET_ADMIN и worker с отдельной сетевой ролью;
 - Docker-развёртывание;
 - CI с Python-тестами и проверкой Docker-сборки;
 - одно-командная установка на отдельную Debian/Ubuntu VM.
