@@ -1,3 +1,19 @@
+from vpn_bench.capabilities import detect_capabilities, preferred_cores
+
+
+def test_xhttp_prefers_lx_then_extended_then_xray():
+    assert preferred_cores("vless", "xhttp") == (
+        "sing-box-lx",
+        "sing-box-extended",
+        "xray",
+    )
+
+
+def test_unknown_protocol_is_not_claimed_supported():
+    caps = detect_capabilities("tuic", "udp")
+    assert all(not item.supported for item in caps)
+
+
 import threading
 
 from vpn_bench.benchmark import BenchmarkEngine
@@ -14,7 +30,7 @@ class FakeAdapter:
 
 def test_engine_connects_probes_and_disconnects(monkeypatch):
     engine = BenchmarkEngine(probe_interval_seconds=2)
-    engine.singbox_adapter = FakeAdapter()
+    engine.lx_adapter = FakeAdapter()
     monkeypatch.setattr(
         "vpn_bench.benchmark.run_proxy_probe",
         lambda *args, **kwargs: ProxyProbeResult(
