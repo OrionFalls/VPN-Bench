@@ -10,3 +10,7 @@ benchmark:
   default_duration_seconds: 600
   default_mode: equal_time
   retention_days: 90
+  probe_interval_seconds: 15
+  dns_domain: example.com
+  http_targets:
+    - https://example.com/
