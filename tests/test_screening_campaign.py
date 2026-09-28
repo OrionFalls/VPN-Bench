@@ -12,6 +12,7 @@ class FakeWorker:
 
     def run_server(self, server, allocation_seconds, stop_event, on_result=None):
         self.calls.append((server["id"], allocation_seconds))
+        stop_event.wait(0.01)
         result = {
             "server_id": server["id"],
             "started_at": "2026-01-01T00:00:00+00:00",
