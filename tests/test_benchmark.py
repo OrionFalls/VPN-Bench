@@ -1,7 +1,10 @@
 from vpn_bench.capabilities import detect_capabilities, preferred_cores
 
 
-def test_xhttp_prefers_lx_then_extended_then_xray():
+def test_xhttp_prefers_lx_then_extended_then_xray(monkeypatch):
+    import vpn_bench.capabilities as capabilities
+
+    monkeypatch.setattr(capabilities.shutil, "which", lambda binary: "/usr/bin/xray" if binary == "xray" else None)
     assert preferred_cores("vless", "xhttp") == (
         "sing-box-lx",
         "sing-box-extended",
