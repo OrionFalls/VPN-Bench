@@ -9,9 +9,11 @@ def test_xhttp_prefers_lx_then_extended_then_xray():
     )
 
 
-def test_unknown_protocol_is_not_claimed_supported():
+def test_tuic_is_supported_by_sing_box_cores():
     caps = detect_capabilities("tuic", "udp")
-    assert all(not item.supported for item in caps)
+    assert caps[0].supported
+    assert caps[1].supported
+    assert not caps[2].supported
 
 
 import threading
