@@ -30,7 +30,7 @@ services:
     command: ["python", "-m", "vpn_bench.worker"]
     environment:
       VPN_BENCH_WORKER_TOKEN: ${VPN_BENCH_WORKER_TOKEN}
-      VPN_BENCH_PROBE_INTERVAL: ${VPN_BENCH_PROBE_INTERVAL:-15}
+      VPN_BENCH_CONFIG: /app/config/config.yaml
       VPN_BENCH_HTTP_TARGETS: ${VPN_BENCH_HTTP_TARGETS:-https://example.com/}
       VPN_BENCH_DNS_DOMAIN: ${VPN_BENCH_DNS_DOMAIN:-example.com}
       VPN_BENCH_THROUGHPUT_URL: ${VPN_BENCH_THROUGHPUT_URL:-}
