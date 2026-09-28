@@ -3,17 +3,10 @@ app:
   port: 8080
   database: /app/data/vpn-bench.sqlite3
 
-providers:
-  - name: example-provider
-    subscription_url: "https://example.invalid/subscription"
-    enabled: false
+providers: []
 
 benchmark:
-  screening:
-    enabled: true
-    connect_timeout_seconds: 15
-    test_duration_seconds: 60
-  monitoring:
-    enabled: true
-    probe_interval_seconds: 60
-    throughput_interval_seconds: 900
+  update_interval_seconds: 1
+  default_duration_seconds: 600
+  default_mode: equal_time
+  retention_days: 90
