@@ -388,6 +388,37 @@ def build_app(config: Config) -> FastAPI:
             raise HTTPException(status_code=404, detail="Active test run not found")
         return {"ok": True}
 
+    @app.get("/api/v1/tests/{run_id}/results")
+    def test_results(run_id: str, _: str = Depends(require_auth)) -> list[dict]:
+        with db() as connection:
+            rows = connection.execute(
+                "SELECT id, server_id, started_at, duration_seconds, success, latency_ms, jitter_ms, "
+                "packet_loss_percent, download_mbps, upload_mbps, dns_ok, http_ok, details_json "
+                "FROM test_results WHERE run_id = ? ORDER BY id",
+                (run_id,),
+            ).fetchall()
+        return [
+            dict(row) | {"details": json_loads(row["details_json"])}
+            for row in rows
+        ]
+
+    @app.get("/api/v1/analytics")
+    def analytics(_: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            rows = connection.execute(
+                "SELECT s.id, s.provider, s.name, s.protocol, s.transport, "
+                "COUNT(r.id) AS samples, "
+                "AVG(CASE WHEN r.success = 1 THEN 1.0 ELSE 0.0 END) * 100 AS availability, "
+                "AVG(r.latency_ms) AS latency_ms, "
+                "AVG(r.jitter_ms) AS jitter_ms, "
+                "AVG(r.packet_loss_percent) AS packet_loss_percent, "
+                "AVG(r.download_mbps) AS download_mbps, "
+                "AVG(r.upload_mbps) AS upload_mbps "
+                "FROM servers s LEFT JOIN test_results r ON r.server_id = s.id "
+                "GROUP BY s.id ORDER BY availability DESC, latency_ms ASC, s.provider, s.name"
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     @app.get("/api/v1/dashboard")
     def dashboard(_: str = Depends(require_auth)) -> dict:
         latest = manager.latest()
