@@ -117,6 +117,59 @@ class NamespaceManager:
     def exec_prefix(self, ns: NetworkNamespace) -> list[str]:
         return ["ip", "netns", "exec", ns.name]
 
+    def enable_kill_switch(self, ns: NetworkNamespace) -> None:
+        """Fail closed after the VPN core has established its upstream session.
+
+        Existing connections remain usable; new namespace egress is limited to
+        the currently observed VPN upstream peers. This prevents a dead or
+        misconfigured proxy process from falling back to the namespace's plain
+        NAT route.
+        """
+        peers = self._upstream_peers(ns)
+        if not peers:
+            raise NamespaceError("Could not identify VPN upstream peer for kill-switch")
+        for protocol, address, port in peers:
+            self._run([
+                "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
+                "-p", protocol, "-d", address, "--dport", str(port), "-j", "ACCEPT",
+            ])
+        self._run([
+            "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
+            "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
+        ])
+        self._run([
+            "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
+            "-o", "lo", "-j", "ACCEPT",
+        ])
+        self._run([
+            "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
+            "-j", "DROP",
+        ])
+
+    def _upstream_peers(self, ns: NetworkNamespace) -> list[tuple[str, str, int]]:
+        result = self._run([
+            "ip", "netns", "exec", ns.name, "ss", "-H", "-n", "-t", "-u",
+        ], check=False)
+        peers: set[tuple[str, str, int]] = set()
+        for line in result.stdout.splitlines():
+            fields = line.split()
+            if len(fields) < 5:
+                continue
+            state = fields[0]
+            local = fields[3]
+            remote = fields[4]
+            if remote in {"*", "*:*", "0.0.0.0:*", "[::]:*"}:
+                continue
+            parsed = _parse_peer(remote)
+            if parsed is None:
+                continue
+            protocol = "udp" if "udp" in line.lower() else "tcp"
+            address, port = parsed
+            if address in {ns.host_ip, ns.namespace_ip, "127.0.0.1"}:
+                continue
+            peers.add((protocol, address, port))
+        return sorted(peers)
+
     def _add_nat(self, ns: NetworkNamespace) -> None:
         uplink = ns.uplink
         self._run([
@@ -159,6 +212,25 @@ class NamespaceManager:
                 f"{result.stderr.strip() or result.stdout.strip()}"
             )
         return result
+
+
+def _parse_peer(value: str) -> tuple[str, int] | None:
+    value = value.strip()
+    if value.startswith("["):
+        end = value.rfind("]")
+        if end < 0:
+            return None
+        address = value[1:end]
+        port_text = value[end + 2:] if value[end + 1:end + 2] == ":" else ""
+    else:
+        if ":" not in value:
+            return None
+        address, port_text = value.rsplit(":", 1)
+    try:
+        port = int(port_text)
+    except ValueError:
+        return None
+    return address, port
 
 
 def _which(command: str) -> bool:
