@@ -50,9 +50,9 @@ VPN-Bench предназначен для автоматического сра�
 | **sing-box-extended** | расширенный fork с дополнительными протоколами и функциями |
 | **Xray** | backend для XHTTP/Xray-специфичных конфигураций и совместимости |
 
-sing-box-lx позиционируется как тонкий fork upstream sing-box с XHTTP, AmneziaWG и дополнительными клиентскими возможностями. citeturn0search0
+sing-box-lx позиционируется как тонкий fork upstream sing-box с XHTTP, AmneziaWG и дополнительными клиентскими возможностями.
 
-sing-box-extended добавляет WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, расширенные WireGuard-возможности, XHTTP и дополнительные транспорты. Его parser также заявляет поддержку share links для VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC и AnyTLS. citeturn0search1turn0search4
+sing-box-extended добавляет WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, расширенные WireGuard-возможности, XHTTP и дополнительные транспорты. Его parser также заявляет поддержку share links для VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC и AnyTLS.
 
 Поэтому VPN-Bench не должен искусственно отбрасывать сервер только потому, что его не умеет стандартный sing-box. Диспетчер ядра будет выбирать backend по возможностям конкретного узла.
 
@@ -279,9 +279,9 @@ Throughput benchmarking, whitelist-bypass testing, long-term stability testing a
 | **sing-box-extended** | extended fork with additional protocols and features |
 | **Xray** | XHTTP/Xray-specific compatibility backend |
 
-sing-box-lx is a thin sing-box fork adding XHTTP, AmneziaWG and additional client-side capabilities. citeturn0search0
+sing-box-lx is a thin sing-box fork adding XHTTP, AmneziaWG and additional client-side capabilities.
 
-sing-box-extended adds WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, extended WireGuard capabilities, XHTTP and additional transports. Its parser also lists VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC and AnyTLS share links. citeturn0search1turn0search4
+sing-box-extended adds WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, extended WireGuard capabilities, XHTTP and additional transports. Its parser also lists VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC and AnyTLS share links.
 
 VPN-Bench should therefore not reject a server simply because upstream sing-box cannot handle it. The core dispatcher will select a backend according to the capabilities required by each node.
 
