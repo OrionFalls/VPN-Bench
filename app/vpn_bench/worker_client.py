@@ -60,6 +60,10 @@ class WorkerClient:
                 )
             time.sleep(self.poll_interval)
 
+        try:
+            self._request("DELETE", f"/jobs/{job_id}")
+        except WorkerClientError:
+            pass
         return False
 
     def _request(self, method: str, path: str, payload: dict | None = None) -> dict:
