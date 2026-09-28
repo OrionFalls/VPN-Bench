@@ -8,7 +8,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from .adapters.singbox import SingBoxAdapter
 from .adapters.extended import SingBoxExtendedAdapter, SingBoxLXAdapter
 from .adapters.xray import XrayAdapter
 from .proxied_probes import run_proxy_probe
@@ -24,9 +23,6 @@ class BenchmarkEngine:
         self.probe_interval_seconds = max(2, probe_interval_seconds)
         self.http_targets = http_targets or ["https://example.com/"]
         self.dns_domain = dns_domain
-        self.singbox_adapter = SingBoxAdapter(
-            binary=os.environ.get("VPN_BENCH_SING_BOX", "sing-box")
-        )
         self.extended_adapter = SingBoxExtendedAdapter(
             binary=os.environ.get("VPN_BENCH_SING_BOX_EXTENDED", "sing-box-extended")
         )
@@ -42,7 +38,7 @@ class BenchmarkEngine:
         protocol = str(server.get("protocol") or "").lower()
         if transport == "xhttp" or protocol in {"masque", "mieru", "trusttunnel", "ssh", "tuic", "anytls"}:
             return (self.extended_adapter, self.lx_adapter, self.xray_adapter)
-        return (self.singbox_adapter, self.lx_adapter, self.extended_adapter, self.xray_adapter)
+        return (self.lx_adapter, self.extended_adapter, self.xray_adapter)
 
     def run_server(
         self,
