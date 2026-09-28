@@ -18,7 +18,10 @@ class ScreeningState:
     total_servers: int
     current_pass: int = 0
     current_server_id: str | None = None
+    current_server_name: str | None = None
     completed_servers: int = 0
+    pass_completed: int = 0
+    pass_total: int = 0
     shortlisted_servers: list[str] = field(default_factory=list)
     failed_servers: int = 0
     started_at: float = field(default_factory=time.time)
@@ -33,15 +36,18 @@ class ScreeningState:
             "total_servers": self.total_servers,
             "current_pass": self.current_pass,
             "current_server_id": self.current_server_id,
+            "current_server_name": self.current_server_name,
             "completed_servers": self.completed_servers,
+            "pass_completed": self.pass_completed,
+            "pass_total": self.pass_total,
             "shortlisted_servers": list(self.shortlisted_servers),
             "shortlist_count": len(self.shortlisted_servers),
             "shortlist": list(self.shortlisted_servers),
             "failed_servers": self.failed_servers,
             "elapsed_seconds": round(max(0.0, elapsed), 1),
             "progress": round(
-                (self.completed_servers / self.total_servers) * 100, 2
-            ) if self.total_servers else 100.0,
+                (self.pass_completed / self.pass_total) * 100, 2
+            ) if self.pass_total else 100.0,
             "message": self.message,
         }
 
@@ -121,6 +127,8 @@ class ScreeningCampaignManager:
                     break
                 state.current_pass = pass_no
                 candidates = self.plan.next_candidates(all_ids, survivors)
+                state.pass_total = len(candidates)
+                state.pass_completed = 0
                 state.message = f"Screening pass {pass_no}: {len(candidates)} servers."
                 pass_samples: dict[str, list[dict[str, Any]]] = {}
 
@@ -128,6 +136,7 @@ class ScreeningCampaignManager:
                     if stop_event.is_set():
                         break
                     state.current_server_id = server_id
+                    state.current_server_name = servers[server_id].get("name")
                     samples: list[dict[str, Any]] = []
                     pass_samples[server_id] = samples
 
@@ -147,6 +156,7 @@ class ScreeningCampaignManager:
                     if not ok:
                         state.failed_servers += 1
                     state.completed_servers += 1
+                    state.pass_completed += 1
 
                 if stop_event.is_set():
                     break
@@ -170,6 +180,7 @@ class ScreeningCampaignManager:
                 else:
                     state.status = "completed"
                 state.current_server_id = None
+                state.current_server_name = None
                 state.finished_at = time.time()
                 state.message = (
                     f"Screening complete: {len(state.shortlisted_servers)} servers shortlisted."
@@ -181,6 +192,7 @@ class ScreeningCampaignManager:
                 state.status = "failed"
                 state.finished_at = time.time()
                 state.current_server_id = None
+                state.current_server_name = None
                 state.message = f"Screening failed: {exc}"
             if on_finish:
                 on_finish(state, self.samples(state.run_id))
