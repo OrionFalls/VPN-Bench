@@ -15,11 +15,18 @@ jobs:
         with:
           python-version: "3.13"
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install
         run: pip install .
 
       - name: Test
         run: pip install pytest && pytest -q
+
+      - name: Validate UI JavaScript
+        run: node --check app/vpn_bench/static/app.js
 
   docker:
     runs-on: ubuntu-latest
