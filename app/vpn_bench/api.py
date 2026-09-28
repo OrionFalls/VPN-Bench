@@ -535,6 +535,26 @@ def build_app(config: Config) -> FastAPI:
         )
         return state.as_dict()
 
+    @app.post("/api/v1/screening/{run_id}/start-test")
+    def start_test_from_screening(
+        run_id: str,
+        payload: TestStartRequest,
+        _: str = Depends(require_auth),
+    ) -> dict:
+        state = screening.get(run_id)
+        if not state or state.status != "completed":
+            raise HTTPException(status_code=409, detail="Screening run is not completed")
+        if not state.shortlisted_servers:
+            raise HTTPException(status_code=409, detail="Screening produced no shortlist")
+        return start_test(
+            TestStartRequest(
+                server_ids=state.shortlisted_servers,
+                duration_seconds=payload.duration_seconds,
+                scheduling_mode=payload.scheduling_mode,
+            ),
+            "",
+        )
+
     @app.post("/api/v1/screening/{run_id}/stop")
     def stop_screening(run_id: str, _: str = Depends(require_auth)) -> dict:
         if not screening.stop(run_id):
