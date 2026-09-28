@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .config import Config
+from .benchmark import BenchmarkEngine
 from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
@@ -82,6 +83,11 @@ class FilterRequest(BaseModel):
 def build_app(config: Config) -> FastAPI:
     initialize(config.app.database)
     manager = TestRunManager()
+    engine = BenchmarkEngine(
+        probe_interval_seconds=config.benchmark.probe_interval_seconds,
+        http_targets=list(config.benchmark.http_targets),
+        dns_domain=config.benchmark.dns_domain,
+    )
     app = FastAPI(title="VPN-Bench API", version=config.app.version)
 
     def db() -> sqlite3.Connection:
@@ -286,7 +292,8 @@ def build_app(config: Config) -> FastAPI:
         with db() as connection:
             placeholders = ",".join("?" for _ in payload.server_ids)
             rows = connection.execute(
-                f"SELECT id, name FROM servers WHERE id IN ({placeholders})", payload.server_ids
+                f"SELECT id, name, provider, protocol, host, port, transport, security, metadata_json "
+                f"FROM servers WHERE id IN ({placeholders})", payload.server_ids
             ).fetchall()
         if len(rows) != len(set(payload.server_ids)):
             raise HTTPException(status_code=400, detail="One or more selected servers do not exist")
@@ -295,25 +302,34 @@ def build_app(config: Config) -> FastAPI:
 
         run_id = uuid4().hex
         names = {row["id"]: row["name"] for row in rows}
-        state = manager.create(
-            run_id,
-            payload.server_ids,
-            payload.duration_seconds,
-            payload.scheduling_mode,
-            names,
-        )
+        server_data = {
+            row["id"]: {
+                "id": row["id"],
+                "name": row["name"],
+                "provider": row["provider"],
+                "protocol": row["protocol"],
+                "host": row["host"],
+                "port": row["port"],
+                "transport": row["transport"],
+                "security": row["security"],
+                "metadata": json_loads(row["metadata_json"]),
+            }
+            for row in rows
+        }
+
         with db() as connection:
+            started_at = utc_now()
             connection.execute(
                 "INSERT INTO test_runs(id,status,scheduling_mode,planned_seconds,started_at,total_servers,message) "
                 "VALUES(?,?,?,?,?,?,?)",
                 (
                     run_id,
-                    state.status,
-                    state.scheduling_mode,
-                    state.planned_seconds,
-                    datetime.fromtimestamp(state.started_at, timezone.utc).isoformat(),
-                    state.total_servers,
-                    state.message,
+                    "running",
+                    payload.scheduling_mode,
+                    payload.duration_seconds,
+                    started_at,
+                    len(payload.server_ids),
+                    "Test campaign started.",
                 ),
             )
             for position, server_id in enumerate(payload.server_ids):
@@ -321,6 +337,47 @@ def build_app(config: Config) -> FastAPI:
                     "INSERT INTO test_run_servers(run_id,server_id,position) VALUES(?,?,?)",
                     (run_id, server_id, position),
                 )
+
+        def on_server(server_id: str, allocation: float, stop_event) -> bool:
+            def on_result(result: dict) -> None:
+                with db() as connection:
+                    import json
+                    connection.execute(
+                        "INSERT INTO test_results(run_id,server_id,started_at,duration_seconds,success,latency_ms,jitter_ms,"
+                        "packet_loss_percent,download_mbps,upload_mbps,dns_ok,http_ok,details_json) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            run_id,
+                            result["server_id"],
+                            result["started_at"],
+                            result["duration_seconds"],
+                            int(result["success"]),
+                            result["latency_ms"],
+                            result["jitter_ms"],
+                            result["packet_loss_percent"],
+                            None,
+                            None,
+                            int(result["dns_ok"]) if result["dns_ok"] is not None else None,
+                            int(result["http_ok"]) if result["http_ok"] is not None else None,
+                            json.dumps(result["details"], ensure_ascii=False),
+                        ),
+                    )
+
+            return engine.run_server(
+                server_data[server_id],
+                allocation,
+                stop_event,
+                on_result=on_result,
+            )
+
+        state = manager.create(
+            run_id,
+            payload.server_ids,
+            payload.duration_seconds,
+            payload.scheduling_mode,
+            names,
+            on_server=on_server,
+        )
         return state.as_dict()
 
     @app.post("/api/v1/tests/{run_id}/stop")
