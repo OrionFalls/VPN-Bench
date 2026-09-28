@@ -31,6 +31,7 @@ class BenchmarkConfig:
     http_targets: tuple[str, ...] = ("https://example.com/",)
     throughput_download_url: str | None = None
     throughput_sample_seconds: int = 0
+    whitelist_targets: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ def load_config(path: str | Path) -> Config:
         http_targets=tuple(str(x) for x in benchmark_data.get("http_targets", ["https://example.com/"])),
         throughput_download_url=str(benchmark_data["throughput_download_url"]) if benchmark_data.get("throughput_download_url") else None,
         throughput_sample_seconds=max(0, int(benchmark_data.get("throughput_sample_seconds", 0))),
+        whitelist_targets=tuple(str(x) for x in benchmark_data.get("whitelist_targets", [])),
     )
 
     return Config(app=app, providers=providers, benchmark=benchmark)
