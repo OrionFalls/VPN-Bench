@@ -109,6 +109,9 @@ def parse_subscription(text: str) -> list[ImportedServer]:
             raise SubscriptionError(f"Invalid JSON subscription: {exc}") from exc
         return parse_json(data)
 
+    if "[Interface]" in decoded and "PrivateKey" in decoded:
+        return [_parse_wireguard_conf(decoded)]
+
     result: list[ImportedServer] = []
     for line in decoded.splitlines():
         line = line.strip()
@@ -118,6 +121,82 @@ def parse_subscription(text: str) -> list[ImportedServer]:
         if server:
             result.append(server)
     return result
+
+
+def _parse_wireguard_conf(text: str) -> ImportedServer:
+    section = ""
+    interface: dict[str, list[str]] = {}
+    peers: list[dict[str, list[str]]] = []
+    current_peer: dict[str, list[str]] | None = None
+
+    for raw_line in text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip().lower()
+            if section == "peer":
+                current_peer = {}
+                peers.append(current_peer)
+            continue
+        if "=" not in line:
+            continue
+        key, value = (part.strip() for part in line.split("=", 1))
+        target = interface if section == "interface" else current_peer
+        if target is not None:
+            target.setdefault(key.lower(), []).append(value)
+
+    if not interface.get("privatekey") or not interface.get("address") or not peers:
+        raise SubscriptionError("Invalid WireGuard configuration")
+
+    normalized_peers: list[dict[str, Any]] = []
+    first_host = None
+    first_port = None
+    for peer in peers:
+        endpoint = peer.get("endpoint", [None])[0]
+        public_key = peer.get("publickey", [None])[0]
+        if not endpoint or not public_key:
+            continue
+        parsed_endpoint = urllib.parse.urlsplit("//" + endpoint)
+        host = parsed_endpoint.hostname
+        port = parsed_endpoint.port
+        if not host or not port:
+            raise SubscriptionError(f"Invalid WireGuard endpoint: {endpoint}")
+        first_host = first_host or host
+        first_port = first_port or port
+        normalized_peers.append(
+            {
+                "address": host,
+                "port": port,
+                "public_key": public_key,
+                "pre_shared_key": (peer.get("presharedkey") or [None])[0],
+                "allowed_ips": [
+                    item.strip()
+                    for item in ",".join(peer.get("allowedips", [])).split(",")
+                    if item.strip()
+                ],
+                "persistent_keepalive_interval": (peer.get("persistentkeepalive") or [None])[0],
+            }
+        )
+
+    if not normalized_peers:
+        raise SubscriptionError("WireGuard configuration contains no usable peers")
+
+    raw: dict[str, Any] = {
+        "private_key": interface["privatekey"][0],
+        "address": interface["address"],
+        "peers": normalized_peers,
+    }
+    return ImportedServer(
+        id=_server_id(text),
+        name=str(first_host or "WireGuard"),
+        protocol="wireguard",
+        host=first_host,
+        port=first_port,
+        transport="udp",
+        security=None,
+        raw=raw,
+    )
 
 
 def parse_uri(uri: str) -> ImportedServer | None:
