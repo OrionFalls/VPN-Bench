@@ -51,12 +51,12 @@ VPN-Bench предназначен для автоматического сра�
 
 Архитектура специально не привязана к одному ядру.
 
-| Ядро | Назначение |
-|---|---|
-| **sing-box** | основной upstream backend |
-| **sing-box-lx** | тонкий upstream-совместимый fork с XHTTP и AmneziaWG |
-| **sing-box-extended** | расширенный fork с дополнительными протоколами и функциями |
-| **Xray** | backend для XHTTP/Xray-специфичных конфигураций и совместимости |
+| Ядро | Назначение | Runtime |
+|---|---|---|
+| **sing-box-lx** | основной универсальный backend | ✅ |
+| **sing-box-extended** | дополнительные протоколы и fallback | ✅ |
+| **Xray** | Xray-специфичная совместимость | ✅ |
+| upstream **sing-box** | baseline/reference для разработки | ❌ |
 
 LX становится основным runtime-ядром. Отдельный upstream sing-box в runtime не нужен: он остаётся baseline/reference только для разработки и проверки совместимости.
 
@@ -278,12 +278,12 @@ Throughput benchmarking, whitelist-bypass testing, long-term stability testing a
 
 ## VPN cores
 
-| Core | Purpose |
-|---|---|
-| **sing-box** | upstream baseline backend |
-| **sing-box-lx** | thin upstream-compatible fork with XHTTP and AmneziaWG |
-| **sing-box-extended** | extended fork with additional protocols and features |
-| **Xray** | XHTTP/Xray-specific compatibility backend |
+| Core | Purpose | Runtime |
+|---|---|---|
+| **sing-box-lx** | primary general-purpose backend | ✅ |
+| **sing-box-extended** | extended protocol fallback | ✅ |
+| **Xray** | Xray-specific compatibility fallback | ✅ |
+| upstream **sing-box** | development/reference baseline | ❌ |
 
 LX is the primary runtime core. The upstream sing-box binary is not shipped in production; it remains a development/reference baseline.
 
