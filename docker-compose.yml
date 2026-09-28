@@ -7,13 +7,40 @@ services:
       VPN_BENCH_CONFIG: /app/config/config.yaml
       VPN_BENCH_DATA_DIR: /app/data
       VPN_BENCH_SECRET: ${VPN_BENCH_SECRET}
+      VPN_BENCH_WORKER_URL: http://vpn-bench-worker:8090
+      VPN_BENCH_WORKER_TOKEN: ${VPN_BENCH_WORKER_TOKEN}
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data
     ports:
       - "8080:8080"
+    depends_on:
+      vpn-bench-worker:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8080/health\")"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  vpn-bench-worker:
+    build: .
+    container_name: vpn-bench-worker
+    restart: unless-stopped
+    command: ["python", "-m", "vpn_bench.worker"]
+    environment:
+      VPN_BENCH_WORKER_TOKEN: ${VPN_BENCH_WORKER_TOKEN}
+      VPN_BENCH_PROBE_INTERVAL: ${VPN_BENCH_PROBE_INTERVAL:-15}
+      VPN_BENCH_HTTP_TARGETS: ${VPN_BENCH_HTTP_TARGETS:-https://example.com/}
+      VPN_BENCH_DNS_DOMAIN: ${VPN_BENCH_DNS_DOMAIN:-example.com}
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8090/health\")"]
       interval: 10s
       timeout: 3s
       retries: 5
