@@ -135,7 +135,10 @@ def run_proxy_probe(
         proxy_url,
         timeout=timeout,
     )
-    http_ok, http_latency, http_status = last_http_ok, last_http_latency, last_http_status
+    if whitelist_targets:
+        http_ok, http_latency, http_status = last_http_ok, last_http_latency, last_http_status
+    else:
+        http_ok, http_latency, http_status = http_head(target, proxy_url, timeout)
     whitelist_results: list[dict[str, Any]] = []
     baseline_by_target = {
         item["target"]: item
