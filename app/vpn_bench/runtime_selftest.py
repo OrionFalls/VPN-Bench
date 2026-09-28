@@ -80,12 +80,11 @@ def main() -> int:
                 "python",
                 "-c",
                 "import socket; s=socket.socket(); s.settimeout(.5); "
-                "try: s.connect(('1.1.1.1', 443)); raise SystemExit(2)\n"
-                "except (TimeoutError, OSError): raise SystemExit(0)",
+                "s.connect_ex(('1.1.1.1', 443)) == 0 and raise SystemExit(2)",
             ],
             check=False,
         )
-        if blocked.returncode != 0:
+        if blocked.returncode == 2:
             raise NamespaceError("Kill-switch did not block an unlisted egress destination")
 
         print("VPN-Bench runtime self-test: PASS")
