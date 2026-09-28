@@ -110,8 +110,14 @@ class XrayAdapter(VPNAdapter):
             time.sleep(0.1)
 
         process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
         log_file.close()
         shutil.rmtree(directory, ignore_errors=True)
+        self.namespace_manager.destroy(namespace)
         raise XrayError("Timed out waiting for Xray proxy")
 
     def disconnect(self, handle: ConnectionHandle) -> None:
