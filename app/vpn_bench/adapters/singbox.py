@@ -157,7 +157,7 @@ def build_config(uri: str) -> dict[str, Any]:
         if query.get("flow"):
             outbound["flow"] = query["flow"][0]
     elif scheme == "trojan":
-        outbound["password"] = password
+        outbound["password"] = username or password
     elif scheme == "ss":
         outbound["method"] = username
         outbound["password"] = password
