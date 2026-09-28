@@ -18,7 +18,7 @@ class CoreCapability:
 
 
 # What our current adapters can generate, not the full upstream protocol list.
-LX_PROTOCOLS = {"vless", "vmess", "trojan", "ss", "shadowsocks", "hysteria2", "hy2"}
+LX_PROTOCOLS = {"vless", "vmess", "trojan", "ss", "shadowsocks", "hysteria2", "hy2", "tuic", "anytls", "socks5", "socks", "naiveproxy"}
 LX_TRANSPORTS = {"tcp", "ws", "websocket", "grpc", "http", "httpupgrade", "quic", "xhttp"}
 
 EXTENDED_PROTOCOLS = {
