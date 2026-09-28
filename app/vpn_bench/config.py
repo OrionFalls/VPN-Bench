@@ -10,7 +10,7 @@ class AppConfig:
     host: str
     port: int
     database: str
-    version: str = "0.1.0"
+    version: str = "0.2.0"
 
 
 @dataclass(frozen=True)
@@ -21,9 +21,18 @@ class ProviderConfig:
 
 
 @dataclass(frozen=True)
+class BenchmarkConfig:
+    update_interval_seconds: int = 1
+    default_duration_seconds: int = 600
+    default_mode: str = "equal_time"
+    retention_days: int = 90
+
+
+@dataclass(frozen=True)
 class Config:
     app: AppConfig
     providers: tuple[ProviderConfig, ...]
+    benchmark: BenchmarkConfig
 
 
 def load_config(path: str | Path) -> Config:
@@ -45,4 +54,12 @@ def load_config(path: str | Path) -> Config:
         for item in data.get("providers", [])
     )
 
-    return Config(app=app, providers=providers)
+    benchmark_data = data.get("benchmark", {})
+    benchmark = BenchmarkConfig(
+        update_interval_seconds=max(1, int(benchmark_data.get("update_interval_seconds", 1))),
+        default_duration_seconds=max(1, int(benchmark_data.get("default_duration_seconds", 600))),
+        default_mode=str(benchmark_data.get("default_mode", "equal_time")),
+        retention_days=max(1, int(benchmark_data.get("retention_days", 90))),
+    )
+
+    return Config(app=app, providers=providers, benchmark=benchmark)
