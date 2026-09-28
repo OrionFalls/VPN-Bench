@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from .adapters.extended import SingBoxExtendedAdapter, SingBoxLXAdapter
 from .adapters.xray import XrayAdapter
-from .proxied_probes import run_proxy_probe
+from .proxied_probes import measure_whitelist_baseline, run_proxy_probe
 from .capabilities import preferred_cores
 
 
@@ -61,6 +61,7 @@ class BenchmarkEngine:
         last_success = False
         adapters = self._adapters_for(server)
         adapter = None
+        whitelist_baseline = measure_whitelist_baseline(self.whitelist_targets) if self.whitelist_targets else []
         connect_errors: list[str] = []
         try:
             for candidate in adapters:
@@ -85,6 +86,7 @@ class BenchmarkEngine:
                     throughput_url=self.throughput_download_url,
                     throughput_duration_seconds=self.throughput_sample_seconds,
                     whitelist_targets=self.whitelist_targets,
+                    whitelist_baseline=whitelist_baseline,
                 )
                 last_success = result.success
                 payload = {
