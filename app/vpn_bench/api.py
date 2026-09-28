@@ -347,7 +347,7 @@ def build_app(config: Config) -> FastAPI:
                     connection.execute(
                         "INSERT INTO test_results(run_id,server_id,started_at,duration_seconds,success,latency_ms,jitter_ms,"
                         "packet_loss_percent,download_mbps,upload_mbps,dns_ok,http_ok,whitelist_ok,details_json) "
-                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             result["server_id"],
@@ -361,7 +361,13 @@ def build_app(config: Config) -> FastAPI:
                             None,
                             int(result["dns_ok"]) if result["dns_ok"] is not None else None,
                             int(result["http_ok"]) if result["http_ok"] is not None else None,
-                            (1 if result.get("details", {}).get("whitelist_ok") else 0) if result.get("details", {}).get("whitelist") else None,
+                            (
+                                None
+                                if result.get("details", {}).get("whitelist_ok") is None
+                                else int(bool(result.get("details", {}).get("whitelist_ok")))
+                            )
+                            if result.get("details", {}).get("whitelist")
+                            else None,
                             json.dumps(result["details"], ensure_ascii=False),
                         ),
                     )
