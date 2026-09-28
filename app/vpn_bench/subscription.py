@@ -63,8 +63,7 @@ def decode_subscription(text: str) -> str:
 
     lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
     if any(re.match(r"^(?:[a-zA-Z][a-zA-Z0-9+.-]*):", line) for line in lines):
-        return "
-".join(lines)
+        return "\n".join(lines)
 
     compact = re.sub(r"\s+", "", cleaned)
     padded = compact + "=" * (-len(compact) % 4)
