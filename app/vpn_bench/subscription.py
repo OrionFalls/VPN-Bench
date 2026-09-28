@@ -9,6 +9,8 @@ from __future__ import annotations
 import base64
 import json
 import re
+import ipaddress
+import socket
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -55,7 +57,43 @@ class SubscriptionError(RuntimeError):
     pass
 
 
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _validate_subscription_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _validate_subscription_url(url: str) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme.lower() not in {"https", "http"}:
+        raise SubscriptionError("Subscription URL must use HTTP or HTTPS")
+    if not parsed.hostname:
+        raise SubscriptionError("Subscription URL has no hostname")
+    if parsed.username or parsed.password:
+        raise SubscriptionError("Subscription URL must not contain credentials")
+
+    try:
+        addresses = {
+            ipaddress.ip_address(item[4][0])
+            for item in socket.getaddrinfo(parsed.hostname, parsed.port or 443, type=socket.SOCK_STREAM)
+        }
+    except socket.gaierror as exc:
+        raise SubscriptionError(f"Unable to resolve subscription host: {exc}") from exc
+
+    for address in addresses:
+        if (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            raise SubscriptionError("Subscription URL resolves to a private or local address")
+
+
 def fetch_subscription(url: str, timeout: float = 20.0) -> tuple[str, dict[str, str]]:
+    _validate_subscription_url(url)
     request = urllib.request.Request(
         url,
         headers={
@@ -63,8 +101,10 @@ def fetch_subscription(url: str, timeout: float = 20.0) -> tuple[str, dict[str, 
             "Accept": "*/*",
         },
     )
+    opener = urllib.request.build_opener(_SafeRedirectHandler)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
+            _validate_subscription_url(response.geturl())
             body = response.read(4 * 1024 * 1024 + 1)
             if len(body) > 4 * 1024 * 1024:
                 raise SubscriptionError("Subscription is larger than the 4 MiB limit")
