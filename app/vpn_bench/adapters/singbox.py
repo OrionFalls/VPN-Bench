@@ -161,7 +161,7 @@ def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str,
     scheme = parsed.scheme.lower()
     if scheme == "vmess":
         return _vmess_config(uri)
-    if scheme not in {"vless", "trojan", "ss", "hysteria2", "hy2", "tuic", "anytls", "socks5", "socks", "naive+https", "naive+quic"}:
+    if scheme not in {"vless", "trojan", "ss", "hysteria2", "hy2", "tuic", "anytls", "socks5", "socks", "naive", "naive+https", "naive+quic"}:
         raise SingBoxError(f"Unsupported sing-box URI scheme: {scheme}")
 
     query = parse_qs(parsed.query)
@@ -204,7 +204,7 @@ def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str,
             outbound["username"] = username
         if password:
             outbound["password"] = password
-    elif scheme in {"naive+https", "naive+quic"}:
+    elif scheme in {"naive", "naive+https", "naive+quic"}:
         outbound["type"] = "naive"
         outbound["username"] = username
         outbound["password"] = password
