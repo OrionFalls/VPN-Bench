@@ -20,6 +20,7 @@ class NetworkNamespace:
     host_veth: str
     namespace_veth: str
     proxy_url: str
+    uplink: str
 
 
 class NamespaceError(RuntimeError):
@@ -65,6 +66,7 @@ class NamespaceManager:
             raise NamespaceError(f"Namespace name collision: {name}")
         self._names.add(name)
 
+        uplink = self._default_interface()
         ns = NetworkNamespace(
             name=name,
             host_ip=host_ip,
@@ -74,6 +76,7 @@ class NamespaceManager:
             host_veth=host_veth,
             namespace_veth=namespace_veth,
             proxy_url=f"http://{namespace_ip}:0",
+            uplink=uplink,
         )
         try:
             self._run(["ip", "netns", "add", name])
@@ -115,14 +118,14 @@ class NamespaceManager:
         return ["ip", "netns", "exec", ns.name]
 
     def _add_nat(self, ns: NetworkNamespace) -> None:
-        uplink = self._default_interface()
+        uplink = ns.uplink
         self._run([
             "iptables", "-t", "nat", "-A", "POSTROUTING",
             "-s", ns.subnet, "-o", uplink, "-j", "MASQUERADE",
         ])
 
     def _delete_nat(self, ns: NetworkNamespace) -> None:
-        uplink = self._default_interface()
+        uplink = ns.uplink
         self._run([
             "iptables", "-t", "nat", "-D", "POSTROUTING",
             "-s", ns.subnet, "-o", uplink, "-j", "MASQUERADE",
