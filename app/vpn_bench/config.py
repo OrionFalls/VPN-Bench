@@ -26,6 +26,9 @@ class BenchmarkConfig:
     default_duration_seconds: int = 600
     default_mode: str = "equal_time"
     retention_days: int = 90
+    probe_interval_seconds: int = 15
+    dns_domain: str = "example.com"
+    http_targets: tuple[str, ...] = ("https://example.com/",)
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,9 @@ def load_config(path: str | Path) -> Config:
         default_duration_seconds=max(1, int(benchmark_data.get("default_duration_seconds", 600))),
         default_mode=str(benchmark_data.get("default_mode", "equal_time")),
         retention_days=max(1, int(benchmark_data.get("retention_days", 90))),
+        probe_interval_seconds=max(2, int(benchmark_data.get("probe_interval_seconds", 15))),
+        dns_domain=str(benchmark_data.get("dns_domain", "example.com")),
+        http_targets=tuple(str(x) for x in benchmark_data.get("http_targets", ["https://example.com/"])),
     )
 
     return Config(app=app, providers=providers, benchmark=benchmark)
