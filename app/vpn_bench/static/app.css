@@ -109,6 +109,38 @@ button{touch-action:manipulation}
   flex-direction:column;
   justify-content:center;
 }
+.stat-label{color:#66748c;font-size:13px;font-weight:650}
+.stat-value{display:block}
+.status-chip{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  min-height:23px;
+  padding:3px 8px;
+  border-radius:99px;
+  background:#eef3fb;
+  color:#61708a;
+  font-size:11px;
+  font-weight:650;
+}
+.status-chip.is-running{background:#eaf2ff;color:#246df3}
+.current-test{overflow:hidden}
+.test-progress-head{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.test-meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px}
+.test-message{margin-top:8px}
+.empty{display:flex;flex-direction:column;align-items:center;gap:5px;padding:26px 18px;text-align:center;color:#8490a4}
+.empty b{color:#526079;font-size:14px}
+.empty-icon{
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  margin-bottom:3px;
+  border-radius:50%;
+  background:#eef3fb;
+  color:#58708f;
+  font-weight:750;
+}
 .stats .card strong{
   display:block;
   margin:7px 0 2px;
