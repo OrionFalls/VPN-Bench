@@ -87,6 +87,8 @@ class SingBoxAdapter(VPNAdapter):
         if check.returncode != 0:
             log_file.close()
             shutil.rmtree(directory, ignore_errors=True)
+            if namespace and self.namespace_manager:
+                self.namespace_manager.destroy(namespace)
             raise SingBoxError(f"sing-box rejected config: {check.stderr.strip() or check.stdout.strip()}")
 
         process = subprocess.Popen(
@@ -102,6 +104,8 @@ class SingBoxAdapter(VPNAdapter):
                 log_file.close()
                 detail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
                 shutil.rmtree(directory, ignore_errors=True)
+                if namespace and self.namespace_manager:
+                    self.namespace_manager.destroy(namespace)
                 raise SingBoxError(f"sing-box exited during startup: {detail}")
             proxy_host = namespace.namespace_ip if namespace else "127.0.0.1"
             if _port_open(proxy_host, proxy_port):
