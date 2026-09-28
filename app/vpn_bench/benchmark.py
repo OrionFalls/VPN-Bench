@@ -11,6 +11,7 @@ from typing import Any, Callable
 from .adapters.extended import SingBoxExtendedAdapter, SingBoxLXAdapter
 from .adapters.xray import XrayAdapter
 from .proxied_probes import run_proxy_probe
+from .capabilities import preferred_cores
 
 
 class BenchmarkEngine:
@@ -34,11 +35,13 @@ class BenchmarkEngine:
         )
 
     def _adapters_for(self, server: dict[str, Any]):
-        transport = str(server.get("transport") or "").lower()
-        protocol = str(server.get("protocol") or "").lower()
-        if transport == "xhttp" or protocol in {"masque", "mieru", "trusttunnel", "ssh", "tuic", "anytls"}:
-            return (self.extended_adapter, self.lx_adapter, self.xray_adapter)
-        return (self.lx_adapter, self.extended_adapter, self.xray_adapter)
+        names = preferred_cores(server.get("protocol"), server.get("transport"))
+        adapters = {
+            "sing-box-lx": self.lx_adapter,
+            "sing-box-extended": self.extended_adapter,
+            "xray": self.xray_adapter,
+        }
+        return tuple(adapters[name] for name in names)
 
     def run_server(
         self,
@@ -62,7 +65,7 @@ class BenchmarkEngine:
                 except Exception as exc:
                     connect_errors.append(f"{candidate.__class__.__name__}: {exc}")
             if handle is None or adapter is None:
-                raise RuntimeError("All compatible VPN cores failed: " + " | ".join(connect_errors))
+                raise RuntimeError("No compatible VPN core succeeded: " + " | ".join(connect_errors))
             proxy_url = str(handle.metadata["proxy_url"])
             while not stop_event.is_set():
                 elapsed = time.time() - started
