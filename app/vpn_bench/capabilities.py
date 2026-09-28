@@ -27,6 +27,7 @@ LX_PROTOCOLS = {
     "hy2",
     "tuic",
     "anytls",
+    "ssh",
     "socks5",
     "socks",
     "naiveproxy",
