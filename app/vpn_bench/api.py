@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .config import Config
@@ -16,6 +17,7 @@ from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
 from .test_runner import TestRunManager
+from .ui import page
 
 
 SESSION_DAYS = 7
@@ -81,6 +83,10 @@ def build_app(config: Config) -> FastAPI:
             if not row or datetime.fromisoformat(row["expires_at"]) <= datetime.now(timezone.utc):
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
         return vpn_bench_session
+
+    @app.get("/", response_class=HTMLResponse)
+    def root() -> HTMLResponse:
+        return page()
 
     @app.get("/health")
     def health() -> dict:
