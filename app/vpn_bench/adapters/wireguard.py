@@ -1,4 +1,4 @@
-"""Standard WireGuard adapter using wg-quick inside a per-job namespace."""
+"""WireGuard and AmneziaWG adapters using isolated per-job namespaces."""
 
 from __future__ import annotations
 
@@ -49,8 +49,10 @@ class WireGuardAdapter(VPNAdapter):
             }
 
     def connect(self, server: dict[str, Any]) -> ConnectionHandle:
+        if server.get("protocol") == "amneziawg":
+            return self._connect_amneziawg(server)
         if server.get("protocol") != "wireguard":
-            raise WireGuardError("Only standard WireGuard is supported by this adapter")
+            raise WireGuardError("Only WireGuard and AmneziaWG are supported by this adapter")
 
         if not shutil.which(self.binary):
             raise WireGuardError("wg-quick is not installed")
@@ -110,6 +112,64 @@ class WireGuardAdapter(VPNAdapter):
             raise WireGuardError("Timed out waiting for WireGuard probe proxy")
         except Exception:
             self._cleanup_partial(namespace, directory)
+            raise
+
+
+    def _connect_amneziawg(self, server: dict[str, Any]) -> ConnectionHandle:
+        """Run AWG through sing-box-lx's userspace WireGuard endpoint."""
+        if not shutil.which(self.proxy_binary):
+            raise WireGuardError(f"sing-box binary not found: {self.proxy_binary}")
+        raw = server.get("metadata") or {}
+        proxy_port = _free_port()
+        config = build_amneziawg_config(raw, proxy_port)
+        namespace = self.namespace_manager.create(str(server["id"]))
+        directory = Path(tempfile.mkdtemp(prefix="vpn-bench-awg-", dir=self.work_dir))
+        config_path = directory / "config.json"
+        log_path = directory / "proxy.log"
+        config_path.write_text(config, encoding="utf-8")
+        log_file = None
+        process = None
+        try:
+            self._run(namespace, [self.proxy_binary, "check", "-c", str(config_path)], timeout=15)
+            log_file = log_path.open("w", encoding="utf-8")
+            process = subprocess.Popen(
+                self.namespace_manager.exec_prefix(namespace) + [
+                    self.proxy_binary, "run", "-c", str(config_path)
+                ],
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                cwd=directory,
+            )
+            deadline = time.monotonic() + 12
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    detail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
+                    raise WireGuardError(f"sing-box AWG proxy exited: {detail}")
+                if _port_open("127.0.0.1", proxy_port, namespace):
+                    return ConnectionHandle(
+                        server_id=str(server["id"]),
+                        metadata={
+                            "process": process,
+                            "proxy_url": f"http://{namespace.namespace_ip}:{proxy_port}",
+                            "socks_url": f"socks5://{namespace.namespace_ip}:{proxy_port}",
+                            "directory": str(directory),
+                            "log_file": log_file,
+                            "namespace": namespace,
+                        },
+                    )
+                time.sleep(0.1)
+            raise WireGuardError("Timed out waiting for AmneziaWG probe proxy")
+        except Exception:
+            if log_file:
+                log_file.close()
+            if process and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+            shutil.rmtree(directory, ignore_errors=True)
+            self.namespace_manager.destroy(namespace)
             raise
 
     def disconnect(self, handle: ConnectionHandle) -> None:
@@ -195,6 +255,79 @@ def build_wireguard_config(raw: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_amneziawg_config(raw: dict[str, Any], proxy_port: int) -> str:
+    import json
+
+    private_key = raw.get("private_key")
+    addresses = raw.get("address") or raw.get("addresses")
+    peers = raw.get("peers") or []
+    if not private_key or not addresses or not isinstance(peers, list) or not peers:
+        raise WireGuardError("Incomplete AmneziaWG configuration")
+    if isinstance(addresses, str):
+        addresses = [addresses]
+
+    normalized_peers = []
+    for peer in peers:
+        if not isinstance(peer, dict):
+            continue
+        address = peer.get("address") or peer.get("server")
+        port = peer.get("port") or peer.get("server_port")
+        public_key = peer.get("public_key") or peer.get("publicKey")
+        if not address or not port or not public_key:
+            continue
+        allowed = peer.get("allowed_ips") or peer.get("allowedIPs") or ["0.0.0.0/0", "::/0"]
+        if isinstance(allowed, str):
+            allowed = [allowed]
+        item = {
+            "address": address,
+            "port": int(port),
+            "public_key": public_key,
+            "allowed_ips": allowed,
+        }
+        psk = peer.get("pre_shared_key") or peer.get("preshared_key")
+        if psk:
+            item["pre_shared_key"] = psk
+        keepalive = peer.get("persistent_keepalive_interval") or peer.get("persistent_keepalive")
+        if keepalive:
+            item["persistent_keepalive_interval"] = int(keepalive)
+        normalized_peers.append(item)
+
+    if not normalized_peers:
+        raise WireGuardError("AmneziaWG peer endpoint is missing")
+
+    endpoint = {
+        "type": "wireguard",
+        "tag": "awg-endpoint",
+        "system": False,
+        "mtu": int(raw.get("mtu") or 1280),
+        "address": addresses,
+        "private_key": private_key,
+        "peers": normalized_peers,
+    }
+    for key in (
+        "jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4",
+        "i1", "i2", "i3", "i4", "i5", "header_protection_key",
+        "content_padding_addition", "rekey_after_time", "rekey_timeout",
+        "reject_after_time", "keepalive_timeout", "max_handshake_attempts",
+        "random_trailers", "disable_cookies", "id", "ip", "ib",
+    ):
+        if raw.get(key) is not None:
+            endpoint[key] = raw[key]
+
+    return json.dumps({
+        "log": {"level": "warn"},
+        "inbounds": [{
+            "type": "mixed",
+            "tag": "probe-in",
+            "listen": "0.0.0.0",
+            "listen_port": proxy_port,
+        }],
+        "endpoints": [endpoint],
+        "route": {"final": "awg-endpoint"},
+    }, indent=2)
+
+
+
 def _proxy_config(host: str, port: int) -> str:
     import json
 
@@ -224,9 +357,15 @@ def _free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _port_open(host: str, port: int) -> bool:
+def _port_open(host: str, port: int, namespace=None) -> bool:
     import socket
-
+    if namespace is not None:
+        result = subprocess.run(
+            ["ip", "netns", "exec", namespace.name, "sh", "-c",
+             f"python -c 'import socket; s=socket.create_connection(("127.0.0.1", {port}), .2); s.close()'"],
+            capture_output=True,
+        )
+        return result.returncode == 0
     try:
         with socket.create_connection((host, port), timeout=0.2):
             return True
