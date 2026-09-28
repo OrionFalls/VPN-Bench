@@ -102,6 +102,41 @@ CREATE TABLE IF NOT EXISTS test_results (
     FOREIGN KEY(server_id) REFERENCES servers(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS screening_runs (
+    id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    total_servers INTEGER NOT NULL,
+    shortlisted_servers INTEGER NOT NULL DEFAULT 0,
+    message TEXT,
+    shortlist_json TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE TABLE IF NOT EXISTS screening_results (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    server_id TEXT NOT NULL,
+    pass_no INTEGER NOT NULL,
+    started_at TEXT NOT NULL,
+    duration_seconds REAL NOT NULL,
+    success INTEGER NOT NULL,
+    latency_ms REAL,
+    jitter_ms REAL,
+    packet_loss_percent REAL,
+    dns_ok INTEGER,
+    http_ok INTEGER,
+    whitelist_ok INTEGER,
+    details_json TEXT,
+    FOREIGN KEY(run_id) REFERENCES screening_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_screening_results_run
+ON screening_results(run_id);
+
+CREATE INDEX IF NOT EXISTS idx_screening_results_server
+ON screening_results(server_id, started_at);
+
 CREATE TABLE IF NOT EXISTS logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL,
