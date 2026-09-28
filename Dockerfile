@@ -26,7 +26,7 @@ FROM python:3.13-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     VPN_BENCH_SING_BOX_LX=/usr/local/bin/sing-box-lx \
-    VPN_BENCH_SING_BOX_EXTENDED=/usr/local/bin/sing-box-extended \
+    VPN_BENCH_SING_BOX_EXTENDED=/usr/local/bin/sing-box-extended
 
 WORKDIR /app
 
