@@ -18,6 +18,9 @@ from .worker_client import WorkerClient
 from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
+from .screening import ScreeningPolicy
+from .screening_campaign import ScreeningCampaignManager
+from .screening_plan import ScreeningPlan
 from .subscription import SubscriptionError, fetch_subscription, parse_subscription
 from .test_runner import TestRunManager
 from .ui import page
@@ -81,10 +84,19 @@ class FilterRequest(BaseModel):
     expressions: list[str] = Field(default_factory=list)
 
 
+class ScreeningStartRequest(BaseModel):
+    server_ids: list[str] = Field(min_length=1)
+    first_pass_seconds: int = Field(default=30, gt=0, le=300)
+    second_pass_seconds: int = Field(default=30, gt=0, le=300)
+    repeat_passes: int = Field(default=2, ge=1, le=3)
+    max_shortlist: int | None = Field(default=None, gt=0)
+
+
 def build_app(config: Config) -> FastAPI:
     initialize(config.app.database)
     manager = TestRunManager()
     worker = WorkerClient(poll_interval=max(0.5, min(2.0, config.benchmark.probe_interval_seconds / 4)))
+    screening = ScreeningCampaignManager(worker)
     app = FastAPI(title="VPN-Bench API", version=config.app.version)
 
     def db() -> sqlite3.Connection:
@@ -314,7 +326,7 @@ def build_app(config: Config) -> FastAPI:
             placeholders = ",".join("?" for _ in payload.server_ids)
             rows = connection.execute(
                 f"SELECT id, name, provider, protocol, host, port, transport, security, metadata_json "
-                f"FROM servers WHERE id IN ({placeholders})", payload.server_ids
+                f"FROM servers WHERE active = 1 AND id IN ({placeholders})", payload.server_ids
             ).fetchall()
         if len(rows) != len(set(payload.server_ids)):
             raise HTTPException(status_code=400, detail="One or more selected servers do not exist")
@@ -407,6 +419,127 @@ def build_app(config: Config) -> FastAPI:
             on_server=on_server,
         )
         return state.as_dict()
+
+    @app.get("/api/v1/screening/latest")
+    def latest_screening(_: str = Depends(require_auth)) -> dict:
+        state = screening.latest()
+        return state.as_dict() if state else {"status": "idle"}
+
+    @app.get("/api/v1/screening/{run_id}")
+    def screening_status(run_id: str, _: str = Depends(require_auth)) -> dict:
+        state = screening.get(run_id)
+        if state:
+            return state.as_dict()
+        with db() as connection:
+            row = connection.execute(
+                "SELECT id, status, started_at, finished_at, total_servers, shortlisted_servers, message, shortlist_json "
+                "FROM screening_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Screening run not found")
+        return dict(row) | {"shortlist": json_loads(row["shortlist_json"])}
+
+    @app.get("/api/v1/screening/{run_id}/results")
+    def screening_results(run_id: str, _: str = Depends(require_auth)) -> list[dict]:
+        with db() as connection:
+            rows = connection.execute(
+                "SELECT id, server_id, pass_no, started_at, duration_seconds, success, latency_ms, "
+                "jitter_ms, packet_loss_percent, dns_ok, http_ok, whitelist_ok, details_json "
+                "FROM screening_results WHERE run_id = ? ORDER BY id", (run_id,)
+            ).fetchall()
+        return [dict(row) | {"details": json_loads(row["details_json"])} for row in rows]
+
+    @app.post("/api/v1/screening")
+    def start_screening(payload: ScreeningStartRequest, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            placeholders = ",".join("?" for _ in payload.server_ids)
+            rows = connection.execute(
+                f"SELECT id, name, provider, protocol, host, port, transport, security, metadata_json "
+                f"FROM servers WHERE active = 1 AND id IN ({placeholders})",
+                payload.server_ids,
+            ).fetchall()
+        if len(rows) != len(set(payload.server_ids)):
+            raise HTTPException(status_code=400, detail="One or more selected servers are inactive or do not exist")
+
+        current = screening.latest()
+        if current and current.status in {"running", "stopping"}:
+            raise HTTPException(status_code=409, detail="A screening campaign is already running")
+
+        server_data = {
+            row["id"]: {
+                "id": row["id"],
+                "name": row["name"],
+                "provider": row["provider"],
+                "protocol": row["protocol"],
+                "host": row["host"],
+                "port": row["port"],
+                "transport": row["transport"],
+                "security": row["security"],
+                "metadata": json_loads(row["metadata_json"]),
+            }
+            for row in rows
+        }
+        run_id = uuid4().hex
+        plan = ScreeningPlan(
+            first_pass_seconds=payload.first_pass_seconds,
+            second_pass_seconds=payload.second_pass_seconds,
+            repeat_passes=payload.repeat_passes,
+            max_shortlist=payload.max_shortlist,
+        )
+        screening.plan = plan
+
+        with db() as connection:
+            started_at = utc_now()
+            connection.execute(
+                "INSERT INTO screening_runs(id,status,started_at,total_servers,message) VALUES(?,?,?,?,?)",
+                (run_id, "running", started_at, len(server_data), "Screening campaign started."),
+            )
+
+        def save_result(server_id: str, pass_no: int, result: dict) -> None:
+            with db() as connection:
+                import json
+                connection.execute(
+                    "INSERT INTO screening_results(run_id,server_id,pass_no,started_at,duration_seconds,success,"
+                    "latency_ms,jitter_ms,packet_loss_percent,dns_ok,http_ok,whitelist_ok,details_json) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        run_id, server_id, pass_no, result["started_at"], result["duration_seconds"],
+                        int(result["success"]), result["latency_ms"], result["jitter_ms"],
+                        result["packet_loss_percent"],
+                        int(result["dns_ok"]) if result["dns_ok"] is not None else None,
+                        int(result["http_ok"]) if result["http_ok"] is not None else None,
+                        (
+                            int(bool(result.get("details", {}).get("whitelist_ok")))
+                            if result.get("details", {}).get("whitelist_ok") is not None else None
+                        ),
+                        json.dumps(result.get("details", {}), ensure_ascii=False),
+                    ),
+                )
+
+        def finish(state, samples) -> None:
+            with db() as connection:
+                import json
+                connection.execute(
+                    "UPDATE screening_runs SET status=?, finished_at=?, shortlisted_servers=?, message=?, shortlist_json=? WHERE id=?",
+                    (
+                        state.status, utc_now(), len(state.shortlisted_servers), state.message,
+                        json.dumps(state.shortlisted_servers), run_id,
+                    ),
+                )
+
+        state = screening.start(
+            run_id,
+            server_data,
+            on_result=save_result,
+            on_finish=finish,
+        )
+        return state.as_dict()
+
+    @app.post("/api/v1/screening/{run_id}/stop")
+    def stop_screening(run_id: str, _: str = Depends(require_auth)) -> dict:
+        if not screening.stop(run_id):
+            raise HTTPException(status_code=404, detail="Active screening run not found")
+        return {"ok": True}
 
     @app.post("/api/v1/tests/{run_id}/stop")
     def stop_test(run_id: str, _: str = Depends(require_auth)) -> dict:
