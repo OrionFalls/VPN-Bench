@@ -46,6 +46,11 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=12, max_length=256)
+
+
 class ProviderRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     display_name: str | None = Field(default=None, max_length=200)
@@ -124,6 +129,19 @@ def build_app(config: Config) -> FastAPI:
                 connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash(vpn_bench_session),))
         response.delete_cookie("vpn_bench_session", httponly=True, samesite="lax")
         return {"ok": True}
+
+    @app.post("/api/v1/auth/change-password")
+    def change_password(payload: ChangePasswordRequest, response: Response, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            row = connection.execute("SELECT password_hash FROM admins WHERE id = 1").fetchone()
+            if not row or not verify_password(payload.current_password, row["password_hash"]):
+                raise HTTPException(status_code=400, detail="Current password is incorrect")
+            connection.execute(
+                "UPDATE admins SET password_hash = ? WHERE id = 1",
+                (hash_password(payload.new_password),),
+            )
+            connection.execute("DELETE FROM sessions")
+            return _create_session(connection, response)
 
     @app.get("/api/v1/auth/me")
     def me(_: str = Depends(require_auth)) -> dict:
