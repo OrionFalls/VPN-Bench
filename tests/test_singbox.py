@@ -90,3 +90,14 @@ def test_upstream_protocol_defaults_to_tcp():
     from vpn_bench.adapters.singbox import _upstream_protocol
 
     assert _upstream_protocol("vless://uuid@example.com:443") == "tcp"
+
+
+def test_naiveproxy_uri_builds_tls():
+    from vpn_bench.adapters.singbox import build_config
+
+    config = build_config("naive+https://user:pass@example.com:443")
+    outbound = config["outbounds"][0]
+
+    assert outbound["type"] == "naive"
+    assert outbound["tls"]["enabled"] is True
+    assert outbound["quic"] is False
