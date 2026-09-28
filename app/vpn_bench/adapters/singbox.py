@@ -27,9 +27,10 @@ class SingBoxError(RuntimeError):
 
 
 class SingBoxAdapter(VPNAdapter):
-    def __init__(self, binary: str = "sing-box", work_dir: str = "/tmp/vpn-bench") -> None:
+    def __init__(self, binary: str = "sing-box", work_dir: str = "/tmp/vpn-bench", allow_extended_transports: bool = False) -> None:
         self.binary = binary
         self.work_dir = Path(work_dir)
+        self.allow_extended_transports = allow_extended_transports
         self.work_dir.mkdir(parents=True, exist_ok=True)
 
     def import_servers(self, source: str):
@@ -58,7 +59,7 @@ class SingBoxAdapter(VPNAdapter):
         if not uri:
             raise SingBoxError("Server does not contain a source URI")
 
-        config = build_config(uri)
+        config = build_config(uri, allow_extended_transports=self.allow_extended_transports)
         proxy_port = _free_port()
         config["inbounds"][0]["listen_port"] = proxy_port
 
@@ -129,7 +130,7 @@ class SingBoxAdapter(VPNAdapter):
             shutil.rmtree(directory, ignore_errors=True)
 
 
-def build_config(uri: str) -> dict[str, Any]:
+def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str, Any]:
     parsed = urlsplit(uri)
     scheme = parsed.scheme.lower()
     if scheme == "vmess":
@@ -165,7 +166,7 @@ def build_config(uri: str) -> dict[str, Any]:
         outbound["password"] = username or password
 
     _apply_tls(outbound, query, parsed.hostname)
-    _apply_transport(outbound, query)
+    _apply_transport(outbound, query, allow_extended_transports)
 
     return _base_config(outbound)
 
@@ -193,12 +194,19 @@ def _apply_tls(outbound: dict[str, Any], query: dict[str, list[str]], fallback_s
     outbound["tls"] = tls
 
 
-def _apply_transport(outbound: dict[str, Any], query: dict[str, list[str]]) -> None:
+def _apply_transport(outbound: dict[str, Any], query: dict[str, list[str]], allow_extended_transports: bool = False) -> None:
     transport = (query.get("type", query.get("network", ["tcp"]))[0] or "tcp").lower()
     if transport in {"tcp", "none"}:
         return
     if transport == "xhttp":
-        raise SingBoxError("XHTTP requires an adapter for a core that supports XHTTP")
+        if not allow_extended_transports:
+            raise SingBoxError("XHTTP requires a sing-box build with XHTTP support")
+        item = {"type": "xhttp"}
+        for key in ("mode", "path", "host"):
+            if query.get(key):
+                item[key] = query[key][0]
+        outbound["transport"] = item
+        return
     mapping = {"ws": "ws", "websocket": "ws", "grpc": "grpc", "http": "http", "httpupgrade": "httpupgrade", "quic": "quic"}
     if transport not in mapping:
         raise SingBoxError(f"Unsupported V2Ray transport: {transport}")
@@ -237,7 +245,7 @@ def _vmess_config(uri: str) -> dict[str, Any]:
         if raw.get("sni"):
             query["sni"] = [raw["sni"]]
         _apply_tls(outbound, query, server.host)
-    _apply_transport(outbound, query)
+    _apply_transport(outbound, query, allow_extended_transports=True)
     return _base_config(outbound)
 
 
