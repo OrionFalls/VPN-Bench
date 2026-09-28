@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import socket
 import threading
-from contextlib import closing
-
 from .network_namespace import NamespaceManager, NamespaceError
 
 
@@ -27,6 +25,7 @@ def main() -> int:
     listener.listen(1)
     port = listener.getsockname()[1]
 
+    first_accepted = threading.Event()
     accepted = threading.Event()
     accepted_count = 0
     accepted_lock = threading.Lock()
@@ -40,11 +39,13 @@ def main() -> int:
                     conn.recv(1)
                 with accepted_lock:
                     accepted_count += 1
+                    if accepted_count == 1:
+                        first_accepted.set()
             accepted.set()
         finally:
             listener.close()
 
-    thread = threading.Thread(target=accept_once, daemon=True)
+    thread = threading.Thread(target=accept_twice, daemon=True)
     thread.start()
 
     try:
@@ -57,8 +58,8 @@ def main() -> int:
             ns,
             f"import socket; s=socket.create_connection(({ns.host_ip!r}, {port}), 1); s.send(b'x'); s.close()",
         )
-        if not accepted.wait(2):
-            raise NamespaceError("Namespace could not reach worker-side veth twice")
+        if not first_accepted.wait(2):
+            raise NamespaceError("Namespace could not reach worker-side veth")
 
         # Once the kill switch is active, only the explicitly allowed endpoint,
         # established connections, and loopback are permitted.
@@ -69,6 +70,9 @@ def main() -> int:
             ns,
             f"import socket; s=socket.create_connection(({ns.host_ip!r}, {port}), 1); s.send(b'y'); s.close()",
         )
+
+        if not accepted.wait(2):
+            raise NamespaceError("Allowed endpoint was blocked by the kill-switch")
 
         blocked = manager._run(
             manager.exec_prefix(ns)
