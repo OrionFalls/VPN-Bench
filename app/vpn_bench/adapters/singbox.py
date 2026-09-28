@@ -109,6 +109,8 @@ class SingBoxAdapter(VPNAdapter):
                 raise SingBoxError(f"sing-box exited during startup: {detail}")
             proxy_host = namespace.namespace_ip if namespace else "127.0.0.1"
             if _port_open(proxy_host, proxy_port):
+                if namespace and self.namespace_manager:
+                    self.namespace_manager.enable_kill_switch(namespace)
                 return ConnectionHandle(
                     server_id=str(server["id"]),
                     metadata={
