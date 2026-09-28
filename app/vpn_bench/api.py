@@ -546,6 +546,15 @@ def build_app(config: Config) -> FastAPI:
             raise HTTPException(status_code=409, detail="Screening run is not completed")
         if not state.shortlisted_servers:
             raise HTTPException(status_code=409, detail="Screening produced no shortlist")
+        with db() as connection:
+            placeholders = ",".join("?" for _ in state.shortlisted_servers)
+            rows = connection.execute(
+                f"SELECT id FROM servers WHERE active = 1 AND id IN ({placeholders})",
+                state.shortlisted_servers,
+            ).fetchall()
+        if len(rows) != len(state.shortlisted_servers):
+            raise HTTPException(status_code=409, detail="One or more shortlisted servers are no longer active")
+
         return start_test(
             TestStartRequest(
                 server_ids=state.shortlisted_servers,
