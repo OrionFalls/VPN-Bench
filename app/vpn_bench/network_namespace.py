@@ -122,6 +122,7 @@ class NamespaceManager:
         self,
         ns: NetworkNamespace,
         endpoints: list[tuple[str, int, str]] | None = None,
+        interfaces: list[str] | None = None,
     ) -> None:
         """Fail closed after the VPN core has established its upstream session.
 
@@ -148,6 +149,13 @@ class NamespaceManager:
             "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
             "-o", "lo", "-j", "ACCEPT",
         ])
+        for interface in interfaces or []:
+            if not re.fullmatch(r"[a-zA-Z0-9_.-]+", interface):
+                raise NamespaceError(f"Invalid kill-switch interface: {interface}")
+            self._run([
+                "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
+                "-o", interface, "-j", "ACCEPT",
+            ])
         self._run([
             "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
             "-j", "DROP",
