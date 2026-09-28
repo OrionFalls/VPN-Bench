@@ -15,6 +15,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .benchmark import BenchmarkEngine
+from .config import load_config
 
 
 class WorkerJob(BaseModel):
@@ -24,19 +25,16 @@ class WorkerJob(BaseModel):
 
 class Worker:
     def __init__(self) -> None:
+        config_path = os.environ.get("VPN_BENCH_CONFIG", "/app/config/config.yaml")
+        config = load_config(config_path)
         self.engine = BenchmarkEngine(
-            probe_interval_seconds=int(os.environ.get("VPN_BENCH_PROBE_INTERVAL", "15")),
-            http_targets=[
-                x for x in os.environ.get(
-                    "VPN_BENCH_HTTP_TARGETS", "https://example.com/"
-                ).split(",")
-                if x
-            ],
-            dns_domain=os.environ.get("VPN_BENCH_DNS_DOMAIN", "example.com"),
-            throughput_download_url=os.environ.get("VPN_BENCH_THROUGHPUT_URL") or None,
-            throughput_upload_url=os.environ.get("VPN_BENCH_THROUGHPUT_UPLOAD_URL") or None,
-            throughput_sample_seconds=int(os.environ.get("VPN_BENCH_THROUGHPUT_SECONDS", "0")),
-            whitelist_targets=[x for x in os.environ.get("VPN_BENCH_WHITELIST_TARGETS", "").split(",") if x],
+            probe_interval_seconds=config.probe_interval_seconds,
+            http_targets=list(config.http_targets),
+            dns_domain=config.dns_domain,
+            throughput_download_url=config.throughput_download_url,
+            throughput_upload_url=config.throughput_upload_url,
+            throughput_sample_seconds=config.throughput_sample_seconds,
+            whitelist_targets=list(config.whitelist_targets),
         )
         self.jobs: dict[str, dict] = {}
         self.stop_events: dict[str, threading.Event] = {}
