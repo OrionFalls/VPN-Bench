@@ -95,7 +95,9 @@ class WireGuardAdapter(VPNAdapter):
                     raise WireGuardError(f"sing-box probe proxy exited: {detail}")
                 if _port_open(namespace.namespace_ip, proxy_port):
                     self.namespace_manager.enable_kill_switch(
-                        namespace, _wireguard_endpoints(raw)
+                        namespace,
+                        _wireguard_endpoints(raw),
+                        interfaces=["wg0"],
                     )
                     return ConnectionHandle(
                         server_id=str(server["id"]),
