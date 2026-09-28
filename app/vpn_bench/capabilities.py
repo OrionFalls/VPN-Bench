@@ -33,6 +33,7 @@ LX_PROTOCOLS = {
 }
 LX_TRANSPORTS = {
     "tcp",
+    "udp",
     "ws",
     "websocket",
     "grpc",
