@@ -40,6 +40,41 @@ def http_head(url: str, proxy_url: str, timeout: float = 8.0) -> tuple[bool, flo
         return False, None, None
 
 
+def direct_http_head(url: str, timeout: float = 8.0) -> tuple[bool, float | None, int | None]:
+    """Check a target without using a proxy."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "VPN-Bench/0.2"},
+        method="HEAD",
+    )
+    started = time.perf_counter()
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            response.read(1)
+            return True, (time.perf_counter() - started) * 1000, response.status
+    except Exception:
+        return False, None, None
+
+
+def measure_whitelist_baseline(
+    targets: list[str],
+    timeout: float = 8.0,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for target in targets:
+        reachable, latency, status = direct_http_head(target, timeout=timeout)
+        results.append(
+            {
+                "target": target,
+                "reachable_without_vpn": reachable,
+                "latency_ms": latency,
+                "status": status,
+            }
+        )
+    return results
+
+
 def dns_over_https(
     domain: str,
     proxy_url: str,
@@ -75,6 +110,7 @@ def run_proxy_probe(
     throughput_url: str | None = None,
     throughput_duration_seconds: float = 0.0,
     whitelist_targets: list[str] | None = None,
+    whitelist_baseline: list[dict[str, Any]] | None = None,
 ) -> ProxyProbeResult:
     latency_samples: list[float] = []
     failures = 0
@@ -94,9 +130,31 @@ def run_proxy_probe(
     )
     http_ok, http_latency, http_status = http_head(target, proxy_url, timeout)
     whitelist_results: list[dict[str, Any]] = []
+    baseline_by_target = {
+        item["target"]: item
+        for item in (whitelist_baseline or [])
+        if isinstance(item, dict) and item.get("target")
+    }
     for whitelist_target in whitelist_targets or []:
         ok, latency, status = http_head(whitelist_target, proxy_url, timeout)
-        whitelist_results.append({"target": whitelist_target, "ok": ok, "latency_ms": latency, "status": status})
+        baseline = baseline_by_target.get(whitelist_target, {})
+        baseline_reachable = baseline.get("reachable_without_vpn")
+        if baseline_reachable is False:
+            bypass_ok = ok
+        else:
+            bypass_ok = None
+        whitelist_results.append(
+            {
+                "target": whitelist_target,
+                "ok": ok,
+                "latency_ms": latency,
+                "status": status,
+                "reachable_without_vpn": baseline_reachable,
+                "bypass_ok": bypass_ok,
+            }
+        )
+    applicable = [item["bypass_ok"] for item in whitelist_results if item["bypass_ok"] is not None]
+    whitelist_ok = all(applicable) if applicable else None
 
     throughput = None
     if throughput_url and throughput_duration_seconds > 0:
@@ -132,6 +190,7 @@ def run_proxy_probe(
             "latency_samples_ms": latency_samples,
             "throughput": throughput,
             "whitelist": whitelist_results,
-            "whitelist_ok": bool(whitelist_results) and all(item["ok"] for item in whitelist_results),
+            "whitelist_ok": whitelist_ok,
+            "whitelist_baseline": whitelist_baseline or [],
         },
     )
