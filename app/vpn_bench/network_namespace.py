@@ -49,6 +49,7 @@ class NamespaceManager:
     def create(self, job_id: str) -> NetworkNamespace:
         self._require_commands()
         safe_id = re.sub(r"[^a-zA-Z0-9]", "", job_id)[:8] or "job"
+        uplink = self._default_interface()
         with self._lock:
             index = self._counter
             self._counter += 1
@@ -82,7 +83,6 @@ class NamespaceManager:
             raise NamespaceError(f"Namespace name collision: {name}")
         self._names.add(name)
 
-        uplink = self._default_interface()
         ns = NetworkNamespace(
             name=name,
             host_ip=host_ip,
