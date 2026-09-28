@@ -94,6 +94,9 @@ class WireGuardAdapter(VPNAdapter):
                     log_file.close()
                     raise WireGuardError(f"sing-box probe proxy exited: {detail}")
                 if _port_open(namespace.namespace_ip, proxy_port):
+                    self.namespace_manager.enable_kill_switch(
+                        namespace, _wireguard_endpoints(raw)
+                    )
                     return ConnectionHandle(
                         server_id=str(server["id"]),
                         metadata={
@@ -146,6 +149,9 @@ class WireGuardAdapter(VPNAdapter):
                     detail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
                     raise WireGuardError(f"sing-box AWG proxy exited: {detail}")
                 if _port_open("127.0.0.1", proxy_port, namespace):
+                    self.namespace_manager.enable_kill_switch(
+                        namespace, _wireguard_endpoints(raw)
+                    )
                     return ConnectionHandle(
                         server_id=str(server["id"]),
                         metadata={
@@ -209,6 +215,18 @@ class WireGuardAdapter(VPNAdapter):
         if check and result.returncode != 0:
             raise WireGuardError(result.stderr.strip() or result.stdout.strip() or "WireGuard command failed")
         return result
+
+
+def _wireguard_endpoints(raw: dict[str, Any]) -> list[tuple[str, int, str]]:
+    endpoints: list[tuple[str, int, str]] = []
+    for peer in raw.get("peers") or []:
+        if not isinstance(peer, dict):
+            continue
+        host = peer.get("address") or peer.get("server")
+        port = peer.get("port") or peer.get("server_port")
+        if host and port:
+            endpoints.append((str(host), int(port), "udp"))
+    return endpoints
 
 
 def build_wireguard_config(raw: dict[str, Any]) -> str:
