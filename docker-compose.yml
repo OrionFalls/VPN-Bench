@@ -40,6 +40,8 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
     devices:
       - /dev/net/tun:/dev/net/tun
     expose:
