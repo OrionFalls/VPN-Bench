@@ -142,15 +142,15 @@ def parse_subscription(text: str) -> list[ImportedServer]:
     if not decoded:
         return []
 
+    if "[Interface]" in decoded and "PrivateKey" in decoded:
+        return [_parse_wireguard_conf(decoded)]
+
     if decoded.startswith("{") or decoded.startswith("["):
         try:
             data = json.loads(decoded)
         except json.JSONDecodeError as exc:
             raise SubscriptionError(f"Invalid JSON subscription: {exc}") from exc
         return parse_json(data)
-
-    if "[Interface]" in decoded and "PrivateKey" in decoded:
-        return [_parse_wireguard_conf(decoded)]
 
     result: list[ImportedServer] = []
     for line in decoded.splitlines():
