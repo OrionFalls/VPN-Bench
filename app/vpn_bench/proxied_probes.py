@@ -115,10 +115,16 @@ def run_proxy_probe(
 ) -> ProxyProbeResult:
     latency_samples: list[float] = []
     failures = 0
+    last_http_ok = False
+    last_http_latency: float | None = None
+    last_http_status: int | None = None
 
     target = http_targets[0] if http_targets else "https://example.com/"
     for _ in range(max(1, attempts)):
-        ok, latency, _ = http_head(target, proxy_url, timeout)
+        ok, latency, status = http_head(target, proxy_url, timeout)
+        last_http_ok = ok
+        last_http_latency = latency
+        last_http_status = status
         if ok and latency is not None:
             latency_samples.append(latency)
         else:
@@ -129,7 +135,7 @@ def run_proxy_probe(
         proxy_url,
         timeout=timeout,
     )
-    http_ok, http_latency, http_status = http_head(target, proxy_url, timeout)
+    http_ok, http_latency, http_status = last_http_ok, last_http_latency, last_http_status
     whitelist_results: list[dict[str, Any]] = []
     baseline_by_target = {
         item["target"]: item
