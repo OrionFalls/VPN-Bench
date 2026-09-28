@@ -35,6 +35,7 @@ class Worker:
             dns_domain=os.environ.get("VPN_BENCH_DNS_DOMAIN", "example.com"),
             throughput_download_url=os.environ.get("VPN_BENCH_THROUGHPUT_URL") or None,
             throughput_sample_seconds=int(os.environ.get("VPN_BENCH_THROUGHPUT_SECONDS", "0")),
+            whitelist_targets=[x for x in os.environ.get("VPN_BENCH_WHITELIST_TARGETS", "").split(",") if x],
         )
         self.jobs: dict[str, dict] = {}
         self.stop_events: dict[str, threading.Event] = {}
