@@ -63,7 +63,8 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
 
     lx = protocol in LX_PROTOCOLS and transport in LX_TRANSPORTS
     extended = protocol in EXTENDED_PROTOCOLS and transport in EXTENDED_TRANSPORTS
-    wireguard = protocol in WIREGUARD_PROTOCOLS and transport in WIREGUARD_TRANSPORTS
+    wireguard = protocol == "wireguard" and transport in WIREGUARD_TRANSPORTS
+    amneziawg = protocol == "amneziawg" and transport in WIREGUARD_TRANSPORTS
     xray = protocol in XRAY_PROTOCOLS and transport in XRAY_TRANSPORTS
 
     return (
@@ -86,7 +87,14 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
             wireguard,
             "supported by the isolated wg-quick adapter"
             if wireguard
-            else "not supported by the current WireGuard adapter",
+            else "not used for AmneziaWG or unsupported protocol",
+        ),
+        CoreCapability(
+            "sing-box-lx",
+            amneziawg,
+            "supported by the isolated AWG endpoint adapter"
+            if amneziawg
+            else "not used for this protocol",
         ),
         CoreCapability(
             "xray",
