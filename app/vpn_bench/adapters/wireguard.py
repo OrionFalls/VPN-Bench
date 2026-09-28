@@ -380,7 +380,7 @@ def _port_open(host: str, port: int, namespace=None) -> bool:
     if namespace is not None:
         result = subprocess.run(
             ["ip", "netns", "exec", namespace.name, "sh", "-c",
-             f"python -c 'import socket; s=socket.create_connection(("127.0.0.1", {port}), .2); s.close()'"],
+             f"python -c 'import socket; s=socket.create_connection((\"127.0.0.1\", {port}), .2); s.close()'"],
             capture_output=True,
         )
         return result.returncode == 0
