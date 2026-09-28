@@ -51,18 +51,20 @@ VPN-Bench предназначен для автоматического сра�
 
 Архитектура специально не привязана к одному ядру.
 
+> **Runtime по умолчанию: только LX + Extended. Xray не входит в базовый Docker image и подключается как optional compatibility backend.**
+
 | Ядро | Назначение | Runtime |
 |---|---|---|
 | **sing-box-lx** | основной универсальный backend | ✅ |
 | **sing-box-extended** | дополнительные протоколы и fallback | ✅ |
-| **Xray** | Xray-специфичная совместимость | ✅ |
+| **Xray** | резервная Xray-специфичная совместимость | optional |
 | upstream **sing-box** | baseline/reference для разработки | ❌ |
 
 LX становится основным runtime-ядром. Отдельный upstream sing-box в runtime не нужен: он остаётся baseline/reference только для разработки и проверки совместимости.
 
 Extended оставляем как специализированный fallback для протоколов и функций, которые выходят за пределы обычной sing-box/LX-модели. Xray — последний compatibility fallback.
 
-**Runtime-цепочка: LX → Extended → Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
+**Runtime-цепочка: LX → Extended → optional Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
 
 ## Импорт подписок
 
@@ -282,14 +284,14 @@ Throughput benchmarking, whitelist-bypass testing, long-term stability testing a
 |---|---|---|
 | **sing-box-lx** | primary general-purpose backend | ✅ |
 | **sing-box-extended** | extended protocol fallback | ✅ |
-| **Xray** | Xray-specific compatibility fallback | ✅ |
+| **Xray** | Xray-specific compatibility fallback | optional |
 | upstream **sing-box** | development/reference baseline | ❌ |
 
 LX is the primary runtime core. The upstream sing-box binary is not shipped in production; it remains a development/reference baseline.
 
 Extended is kept as a specialized fallback for additional protocols and features. Xray remains the final compatibility fallback.
 
-**Runtime strategy: LX → Extended → Xray.**
+**Runtime strategy: LX → Extended → optional Xray.**
 
 ## Real connection testing
 
