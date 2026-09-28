@@ -29,6 +29,8 @@ class BenchmarkConfig:
     probe_interval_seconds: int = 15
     dns_domain: str = "example.com"
     http_targets: tuple[str, ...] = ("https://example.com/",)
+    throughput_download_url: str | None = None
+    throughput_sample_seconds: int = 0
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,8 @@ def load_config(path: str | Path) -> Config:
         probe_interval_seconds=max(2, int(benchmark_data.get("probe_interval_seconds", 15))),
         dns_domain=str(benchmark_data.get("dns_domain", "example.com")),
         http_targets=tuple(str(x) for x in benchmark_data.get("http_targets", ["https://example.com/"])),
+        throughput_download_url=str(benchmark_data["throughput_download_url"]) if benchmark_data.get("throughput_download_url") else None,
+        throughput_sample_seconds=max(0, int(benchmark_data.get("throughput_sample_seconds", 0))),
     )
 
     return Config(app=app, providers=providers, benchmark=benchmark)
