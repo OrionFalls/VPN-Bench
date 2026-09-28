@@ -33,6 +33,11 @@ class BenchmarkEngine:
         self.throughput_upload_url = throughput_upload_url
         self.throughput_sample_seconds = max(0, throughput_sample_seconds)
         self.whitelist_targets = whitelist_targets or []
+        self._whitelist_baseline = (
+            measure_whitelist_baseline(self.whitelist_targets)
+            if self.whitelist_targets
+            else []
+        )
         self.extended_adapter = SingBoxExtendedAdapter(
             binary=os.environ.get("VPN_BENCH_SING_BOX_EXTENDED", "sing-box-extended")
         )
@@ -80,7 +85,7 @@ class BenchmarkEngine:
         last_success = False
         adapters = self._adapters_for(server)
         adapter = None
-        whitelist_baseline = measure_whitelist_baseline(self.whitelist_targets) if self.whitelist_targets else []
+        whitelist_baseline = self._whitelist_baseline
         connect_errors: list[str] = []
         try:
             for candidate in adapters:
