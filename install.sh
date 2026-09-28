@@ -39,12 +39,19 @@ if [[ ! -f config/config.yaml ]]; then
   cp config/config.example.yaml config/config.yaml
 fi
 
+umask 077
 if [[ ! -f .env ]]; then
   echo "Generating application encryption secret..."
-  SECRET="$(python3 -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())' )"
-  WORKER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))' )"
-  umask 077
-  printf 'VPN_BENCH_SECRET=%s\nVPN_BENCH_WORKER_TOKEN=%s\n' "${SECRET}" "${WORKER_TOKEN}" > .env
+  SECRET="$(python3 -c 'import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')"
+  WORKER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+  printf 'VPN_BENCH_SECRET=%s\nVPN_BENCH_WORKER_TOKEN=%s\nVPN_BENCH_NETWORK_NAMESPACE=1\n' "${SECRET}" "${WORKER_TOKEN}" > .env
+else
+  if ! grep -q '^VPN_BENCH_WORKER_TOKEN=' .env; then
+    printf '\nVPN_BENCH_WORKER_TOKEN=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env
+  fi
+  if ! grep -q '^VPN_BENCH_NETWORK_NAMESPACE=' .env; then
+    printf '\nVPN_BENCH_NETWORK_NAMESPACE=1\n' >> .env
+  fi
 fi
 
 chmod 600 .env
