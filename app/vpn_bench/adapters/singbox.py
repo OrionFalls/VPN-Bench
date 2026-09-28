@@ -209,6 +209,10 @@ def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str,
         outbound["username"] = username
         outbound["password"] = password
         outbound["quic"] = scheme == "naive+quic"
+        if not outbound.get("tls"):
+            outbound["tls"] = {"enabled": True, "server_name": parsed.hostname}
+            if query.get("allowInsecure", ["0"])[0].lower() in {"1", "true"}:
+                outbound["tls"]["insecure"] = True
 
     _apply_tls(outbound, query, parsed.hostname)
     _apply_transport(outbound, query, allow_extended_transports)
