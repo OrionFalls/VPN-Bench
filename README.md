@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="assets/logo.svg" alt="VPN-Bench" width="180">
+
 **Real-world VPN benchmarking & long-term connection monitoring**
 
 [![CI](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml/badge.svg)](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white) ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
