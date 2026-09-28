@@ -75,3 +75,18 @@ def test_naive_config():
     assert outbound["type"] == "naive"
     assert outbound["username"] == "user"
     assert outbound["password"] == "secret"
+
+
+def test_upstream_protocol_uses_udp_for_quic_protocols():
+    from vpn_bench.adapters.singbox import _upstream_protocol
+
+    assert _upstream_protocol("hysteria2://example.com:443") == "udp"
+    assert _upstream_protocol("tuic://uuid:pass@example.com:443") == "udp"
+    assert _upstream_protocol("vless://uuid@example.com:443?type=quic") == "udp"
+    assert _upstream_protocol("vless://uuid@example.com:443?type=ws") == "tcp"
+
+
+def test_upstream_protocol_defaults_to_tcp():
+    from vpn_bench.adapters.singbox import _upstream_protocol
+
+    assert _upstream_protocol("vless://uuid@example.com:443") == "tcp"
