@@ -14,11 +14,15 @@ RUN set -eux; \
     esac; \
     curl -fsSL "https://github.com/Leadaxe/sing-box-lx/releases/download/v1.14.2-lx.5/sing-box-1.14.2-lx.5-linux-$LX_ARCH.tar.gz" -o /tmp/lx.tar.gz; \
     tar -xzf /tmp/lx.tar.gz -C /tmp; \
-    find /tmp -type f -name sing-box -exec cp {} /usr/local/bin/sing-box-lx \;; \
+    LX_BIN="$(find /tmp -type f -name sing-box -print -quit)"; \
+    test -n "$LX_BIN"; \
+    cp "$LX_BIN" /usr/local/bin/sing-box-lx; \
     curl -fsSL "https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.1-extended-2.7.2/SFL-1.14.1-extended-2.7.2-$EXT_ARCH.deb" -o /tmp/extended.deb; \
     mkdir -p /tmp/extended; \
     dpkg-deb -x /tmp/extended.deb /tmp/extended; \
-    find /tmp/extended -type f -name 'sing-box*' -perm -u+x -exec cp {} /usr/local/bin/sing-box-extended \\; \
+    EXT_BIN="$(find /tmp/extended -type f -name 'sing-box*' -perm -u+x -print -quit)"; \
+    test -n "$EXT_BIN"; \
+    cp "$EXT_BIN" /usr/local/bin/sing-box-extended; \
     test -x /usr/local/bin/sing-box-extended; \
     chmod +x /usr/local/bin/sing-box-lx /usr/local/bin/sing-box-extended
 
