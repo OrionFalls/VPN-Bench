@@ -14,3 +14,6 @@ benchmark:
   dns_domain: example.com
   http_targets:
     - https://example.com/
+  # Optional controlled throughput endpoint. Leave unset for normal screening.
+  # throughput_download_url: https://bench.example.com/100m.bin
+  throughput_sample_seconds: 0
