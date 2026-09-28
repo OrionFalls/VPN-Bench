@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import re
+import socket
 import subprocess
 import threading
 from dataclasses import dataclass
@@ -117,7 +118,11 @@ class NamespaceManager:
     def exec_prefix(self, ns: NetworkNamespace) -> list[str]:
         return ["ip", "netns", "exec", ns.name]
 
-    def enable_kill_switch(self, ns: NetworkNamespace) -> None:
+    def enable_kill_switch(
+        self,
+        ns: NetworkNamespace,
+        endpoints: list[tuple[str, int, str]] | None = None,
+    ) -> None:
         """Fail closed after the VPN core has established its upstream session.
 
         Existing connections remain usable; new namespace egress is limited to
@@ -125,7 +130,9 @@ class NamespaceManager:
         misconfigured proxy process from falling back to the namespace's plain
         NAT route.
         """
-        peers = self._upstream_peers(ns)
+        peers = self._resolve_endpoints(endpoints or [])
+        if not peers:
+            peers = self._upstream_peers(ns)
         if not peers:
             raise NamespaceError("Could not identify VPN upstream peer for kill-switch")
         for protocol, address, port in peers:
@@ -145,6 +152,29 @@ class NamespaceManager:
             "ip", "netns", "exec", ns.name, "iptables", "-A", "OUTPUT",
             "-j", "DROP",
         ])
+
+
+    @staticmethod
+    def _resolve_endpoints(
+        endpoints: list[tuple[str, int, str]],
+    ) -> list[tuple[str, str, int]]:
+        resolved: set[tuple[str, str, int]] = set()
+        for host, port, protocol in endpoints:
+            try:
+                infos = socket.getaddrinfo(
+                    host,
+                    int(port),
+                    type=socket.SOCK_DGRAM if protocol == "udp" else socket.SOCK_STREAM,
+                )
+            except OSError:
+                continue
+            for family, _, _, _, sockaddr in infos:
+                if family not in {socket.AF_INET, socket.AF_INET6}:
+                    continue
+                address = sockaddr[0]
+                if address:
+                    resolved.add((protocol, address, int(port)))
+        return sorted(resolved)
 
     def _upstream_peers(self, ns: NetworkNamespace) -> list[tuple[str, str, int]]:
         peers: set[tuple[str, str, int]] = set()
