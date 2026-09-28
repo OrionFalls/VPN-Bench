@@ -280,6 +280,40 @@ def parse_uri(uri: str) -> ImportedServer | None:
         transport = transport or "quic"
         security = security or "tls"
 
+    raw = {
+        "uri": uri,
+        "query": query,
+        "username": username,
+        "password": password,
+    }
+    if scheme in {"wireguard", "awg", "amneziawg"}:
+        address = _first(query, "address") or _first(query, "local_address")
+        public_key = _first(query, "publickey") or _first(query, "public_key")
+        if username and address and public_key and host and port:
+            peer = {
+                "address": host,
+                "port": port,
+                "public_key": public_key,
+                "pre_shared_key": _first(query, "presharedkey") or _first(query, "pre_shared_key"),
+                "allowed_ips": _split_csv(_first(query, "allowedips") or _first(query, "allowed_ips") or "0.0.0.0/0"),
+                "persistent_keepalive_interval": _first(query, "keepalive") or _first(query, "persistent_keepalive"),
+            }
+            raw.update({
+                "private_key": username,
+                "address": _split_csv(address),
+                "peers": [peer],
+            })
+            for key in (
+                "mtu", "jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
+                "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5",
+                "header_protection_key", "content_padding_addition",
+                "rekey_after_time", "rekey_timeout", "reject_after_time",
+                "keepalive_timeout", "max_handshake_attempts",
+                "random_trailers", "disable_cookies", "id", "ip", "ib",
+            ):
+                value = _first(query, key)
+                if value is not None:
+                    raw[key] = _coerce_awg_value(key, value)
     return ImportedServer(
         id=_server_id(uri),
         name=name,
@@ -288,12 +322,7 @@ def parse_uri(uri: str) -> ImportedServer | None:
         port=port,
         transport=transport,
         security=security,
-        raw={
-            "uri": uri,
-            "query": query,
-            "username": username,
-            "password": password,
-        },
+        raw=raw,
     )
 
 
@@ -435,6 +464,23 @@ def _server_id(value: str) -> str:
 def _first(values: dict[str, list[str]], key: str) -> str | None:
     value = values.get(key)
     return value[0] if value else None
+
+
+def _split_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _coerce_awg_value(key: str, value: str) -> Any:
+    if key in {"mtu", "jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4"}:
+        if "-" in value and key.startswith("h"):
+            return value
+        try:
+            return int(value)
+        except ValueError:
+            return value
+    if key in {"random_trailers", "disable_cookies"}:
+        return value.lower() in {"1", "true", "yes", "on"}
+    return value
 
 
 def _safe_int(value: Any) -> int | None:
