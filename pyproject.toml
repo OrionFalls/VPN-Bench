@@ -21,5 +21,3 @@ vpn-bench = "vpn_bench.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["app/vpn_bench"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"app/vpn_bench/static" = "vpn_bench/static"
