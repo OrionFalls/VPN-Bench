@@ -55,3 +55,15 @@ def test_engine_connects_probes_and_disconnects(monkeypatch):
     assert ok
     assert len(results) == 1
     assert results[0]["server_id"] == "s1"
+
+
+def test_amneziawg_uses_wireguard_adapter():
+    engine = BenchmarkEngine()
+    adapters = engine._adapters_for({
+        "id": "awg-1",
+        "protocol": "amneziawg",
+        "transport": "udp",
+        "metadata": {"uri": "awg://example"},
+    })
+    assert len(adapters) == 1
+    assert adapters[0] is engine.wireguard_adapter
