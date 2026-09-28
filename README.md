@@ -132,12 +132,15 @@ VPN-Bench не оценивает качество сервера по одно�
 
 VPN-ядро не должно менять default route Proxmox VM, Docker host или основной OpenWrt router.
 
-Планируемая архитектура:
+Архитектура runtime:
 
     VPN-Bench Controller
             |
-            v
+       internal Docker network
+            |
        Isolated Worker
+            |
+      per-job netns
             |
        +----+----+
        |         |
@@ -145,16 +148,17 @@ VPN-ядро не должно менять default route Proxmox VM, Docker hos
        |         |
        +----+----+
             |
-            v
         Test traffic
 
-Только worker должен получать необходимые сетевые права. Контроллер, web UI и база данных не должны получать NET_ADMIN без необходимости.
+Worker создаёт отдельный Linux network namespace и veth/NAT для каждого VPN-сеанса. VPN-core и TUN-интерфейсы остаются внутри этого namespace. Controller не получает NET_ADMIN.
 
 ## Whitelist-bypass
 
-Whitelist-bypass будет отдельным типом теста, а не частью обычного ping/speed benchmark.
+Whitelist-bypass — отдельный тип теста, а не часть обычного ping/speed benchmark.
 
-Будут разделяться обычная доступность Интернета, whitelist-sensitive домены, DNS, HTTP/HTTPS, стабильность и скорость через VPN.
+Для каждого whitelist-sensitive URL сначала выполняется контроль без VPN. Только если URL недоступен без VPN и доступен через VPN, результат считается подтверждённым bypass. Если URL доступен без VPN, результат помечается как `not_applicable`, а не как успешный обход.
+
+Так обычная доступность Интернета не смешивается с проверкой обхода whitelist-политики.
 
 ## Скорость
 
