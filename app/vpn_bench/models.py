@@ -11,6 +11,8 @@ class Server:
     protocol: str
     host: str | None = None
     port: int | None = None
+    transport: str | None = None
+    security: str | None = None
     metadata: dict[str, Any] | None = None
 
 
