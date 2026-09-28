@@ -16,7 +16,7 @@ from typing import Any
 from uuid import uuid5, NAMESPACE_URL
 
 
-SUPPORTED_SCHEMES = {"vless", "vmess", "trojan", "ss", "hysteria2", "hy2"}
+SUPPORTED_SCHEMES = {"vless","vmess","trojan","ss","hysteria2","hy2","tuic","anytls","ssh","socks5","socks","naive+https","naive+quic","wireguard","awg","masque"}
 
 
 @dataclass(frozen=True)
