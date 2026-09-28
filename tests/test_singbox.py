@@ -38,3 +38,16 @@ def test_vless_xhttp_is_available_for_extended_core():
     assert outbound["transport"]["type"] == "xhttp"
     assert outbound["transport"]["mode"] == "auto"
     assert outbound["transport"]["path"] == "/x"
+
+from vpn_bench.subscription import parse_subscription
+
+
+def test_extended_uri_schemes_are_normalized():
+    items = parse_subscription(
+        "tuic://00000000-0000-0000-0000-000000000001:pass@example.com:443#tuic\\n"
+        "anytls://pass@example.com:443#anytls\\n"
+        "ssh://user:pass@example.com:22#ssh\\n"
+        "socks5://user:pass@example.com:1080#socks\\n"
+        "naive+https://user:pass@example.com:443#naive"
+    )
+    assert [item.protocol for item in items] == ["tuic", "anytls", "ssh", "socks5", "naiveproxy"]
