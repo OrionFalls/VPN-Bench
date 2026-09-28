@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from .adapters.base import ConnectionHandle, VPNAdapter
+from .base import ConnectionHandle, VPNAdapter
 
 
 class SingBoxError(RuntimeError):
