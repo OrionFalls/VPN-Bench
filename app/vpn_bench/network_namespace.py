@@ -77,6 +77,8 @@ class NamespaceManager:
         host_veth = f"vbh-{safe_id}-{index:x}"[:15]
         namespace_veth = f"vbn-{safe_id}-{index:x}"[:15]
         if name in self._names:
+            with self._lock:
+                self._subnets.discard(str(subnet))
             raise NamespaceError(f"Namespace name collision: {name}")
         self._names.add(name)
 
