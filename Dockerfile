@@ -20,7 +20,7 @@ RUN set -eux; \
     curl -fsSL "https://github.com/shtorm-7/sing-box-extended/releases/download/v1.14.1-extended-2.7.2/SFL-1.14.1-extended-2.7.2-$EXT_ARCH.deb" -o /tmp/extended.deb; \
     mkdir -p /tmp/extended; \
     dpkg-deb -x /tmp/extended.deb /tmp/extended; \
-    EXT_BIN="$(find /tmp/extended -type f -name 'sing-box*' -perm -u+x -print -quit)"; \
+    EXT_BIN="$(find -L /tmp/extended -type f -name 'sing-box*' -perm -u+x -print -quit)"; \
     test -n "$EXT_BIN"; \
     cp "$EXT_BIN" /usr/local/bin/sing-box-extended; \
     test -x /usr/local/bin/sing-box-extended; \
