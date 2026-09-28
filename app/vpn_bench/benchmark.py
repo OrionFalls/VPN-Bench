@@ -48,7 +48,18 @@ class BenchmarkEngine:
         )
 
     def _adapters_for(self, server: dict[str, Any]):
-        names = preferred_cores(server.get("protocol"), server.get("transport"))
+        protocol = server.get("protocol")
+        transport = server.get("transport")
+        if not protocol:
+            metadata = server.get("metadata") or {}
+            uri = metadata.get("uri") if isinstance(metadata, dict) else None
+            if isinstance(uri, str) and "://" in uri:
+                protocol = uri.split("://", 1)[0].lower()
+                if protocol == "ss":
+                    protocol = "shadowsocks"
+                elif protocol in {"hy2", "hysteria2"}:
+                    protocol = "hysteria2"
+        names = preferred_cores(protocol, transport)
         adapters = {
             "sing-box-lx": self.lx_adapter,
             "sing-box-extended": self.extended_adapter,
