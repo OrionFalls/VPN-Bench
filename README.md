@@ -1,6 +1,14 @@
-# VPN-Bench
+# ⚡ VPN-Bench
 
-**RU | [EN](#english)**
+<div align="center">
+
+**Real-world VPN benchmarking & long-term connection monitoring**
+
+[![CI](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml/badge.svg)](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white) ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+
+**🇷🇺 RU | [🇬🇧 EN](#english)**
+
+</div>
 
 Self-hosted автоматический бенчмарк VPN-серверов и система долгосрочного мониторинга качества соединений.
 
@@ -50,11 +58,11 @@ VPN-Bench предназначен для автоматического сра�
 | **sing-box-extended** | расширенный fork с дополнительными протоколами и функциями |
 | **Xray** | backend для XHTTP/Xray-специфичных конфигураций и совместимости |
 
-sing-box-lx позиционируется как тонкий fork upstream sing-box с XHTTP, AmneziaWG и дополнительными клиентскими возможностями.
+LX становится основным runtime-ядром. Отдельный upstream sing-box в runtime не нужен: он остаётся baseline/reference только для разработки и проверки совместимости.
 
-sing-box-extended добавляет WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, расширенные WireGuard-возможности, XHTTP и дополнительные транспорты. Его parser также заявляет поддержку share links для VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC и AnyTLS.
+Extended оставляем как специализированный fallback для протоколов и функций, которые выходят за пределы обычной sing-box/LX-модели. Xray — последний compatibility fallback.
 
-Поэтому VPN-Bench не должен искусственно отбрасывать сервер только потому, что его не умеет стандартный sing-box. Диспетчер ядра будет выбирать backend по возможностям конкретного узла.
+**Runtime-цепочка: LX → Extended → Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
 
 ## Импорт подписок
 
@@ -164,8 +172,6 @@ Whitelist-bypass будет отдельным типом теста, а не ч
 6. **Logs** — технические события и диагностика.
 7. **Settings** — конфигурация, безопасность, хранилище и обновления.
 
-Визуальная часть интерфейса будет переработана по отдельному Figma-дизайну.
-
 ## Безопасность
 
 URL подписок не возвращаются обычным API списка провайдеров и хранятся в базе в зашифрованном виде. Ключ шифрования хранится отдельно через VPN_BENCH_SECRET.
@@ -229,7 +235,7 @@ CI автоматически запускает тесты на Python 3.13 и 
 
 ## Репозиторий
 
-urlGitHub — OrionFalls/VPN-Benchhttps://github.com/OrionFalls/VPN-Bench
+GitHub: https://github.com/OrionFalls/VPN-Bench
 
 ---
 
@@ -279,11 +285,11 @@ Throughput benchmarking, whitelist-bypass testing, long-term stability testing a
 | **sing-box-extended** | extended fork with additional protocols and features |
 | **Xray** | XHTTP/Xray-specific compatibility backend |
 
-sing-box-lx is a thin sing-box fork adding XHTTP, AmneziaWG and additional client-side capabilities.
+LX is the primary runtime core. The upstream sing-box binary is not shipped in production; it remains a development/reference baseline.
 
-sing-box-extended adds WARP, MASQUE, MTProxy, Mieru, TrustTunnel, SSH, Call, Bond/Fallback/Failover, SDNS, extended WireGuard capabilities, XHTTP and additional transports. Its parser also lists VLESS, VMess, Shadowsocks, Trojan, Hysteria/Hysteria2, TUIC and AnyTLS share links.
+Extended is kept as a specialized fallback for additional protocols and features. Xray remains the final compatibility fallback.
 
-VPN-Bench should therefore not reject a server simply because upstream sing-box cannot handle it. The core dispatcher will select a backend according to the capabilities required by each node.
+**Runtime strategy: LX → Extended → Xray.**
 
 ## Real connection testing
 
