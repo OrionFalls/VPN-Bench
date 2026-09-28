@@ -31,7 +31,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates iproute2 iptables procps \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=cores /usr/local/bin/sing-box-lx /usr/local/bin/sing-box-lx
