@@ -10,6 +10,7 @@ from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from fastapi import Cookie, Depends, FastAPI, HTTPException, Response, status
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .config import Config
@@ -98,6 +99,7 @@ def build_app(config: Config) -> FastAPI:
     worker = WorkerClient(poll_interval=max(0.5, min(2.0, config.benchmark.probe_interval_seconds / 4)))
     screening = ScreeningCampaignManager(worker)
     app = FastAPI(title="VPN-Bench API", version=config.app.version)
+    app.mount("/static", StaticFiles(directory=Path(__file__).with_name("static")), name="static")
 
     def db() -> sqlite3.Connection:
         return connect(config.app.database)
