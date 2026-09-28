@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import threading
 
-from app.vpn_bench.screening_campaign import ScreeningCampaignManager
-from app.vpn_bench.screening_plan import ScreeningPlan
+from vpn_bench.screening_campaign import ScreeningCampaignManager
+from vpn_bench.screening_plan import ScreeningPlan
 
 
 class FakeWorker:
