@@ -17,3 +17,6 @@ benchmark:
   # Optional controlled throughput endpoint. Leave unset for normal screening.
   # throughput_download_url: https://bench.example.com/100m.bin
   throughput_sample_seconds: 0
+  # Optional whitelist-sensitive URLs. Keep this list separate from normal HTTP targets.
+  # whitelist_targets:
+  #   - https://example-whitelist-target.example/
