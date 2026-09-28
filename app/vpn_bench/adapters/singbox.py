@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from ..network_namespace import NamespaceManager
+
 from .base import ConnectionHandle, VPNAdapter
 
 
@@ -32,6 +34,8 @@ class SingBoxAdapter(VPNAdapter):
         self.work_dir = Path(work_dir)
         self.allow_extended_transports = allow_extended_transports
         self.work_dir.mkdir(parents=True, exist_ok=True)
+        self.namespace_enabled = os.environ.get("VPN_BENCH_NETWORK_NAMESPACE", "1").lower() not in {"0", "false", "no"}
+        self.namespace_manager = NamespaceManager() if self.namespace_enabled else None
 
     def import_servers(self, source: str):
         from .subscription import parse_subscription
@@ -60,6 +64,10 @@ class SingBoxAdapter(VPNAdapter):
             raise SingBoxError("Server does not contain a source URI")
 
         config = build_config(uri, allow_extended_transports=self.allow_extended_transports)
+        namespace = None
+        if self.namespace_manager is not None:
+            namespace = self.namespace_manager.create(str(server["id"]))
+            config["inbounds"][0]["listen"] = namespace.namespace_ip
         proxy_port = _free_port()
         config["inbounds"][0]["listen_port"] = proxy_port
 
@@ -69,8 +77,9 @@ class SingBoxAdapter(VPNAdapter):
         config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
         log_file = log_path.open("w", encoding="utf-8")
 
+        command_prefix = self.namespace_manager.exec_prefix(namespace) if namespace else []
         check = subprocess.run(
-            [self.binary, "check", "-c", str(config_path)],
+            command_prefix + [self.binary, "check", "-c", str(config_path)],
             capture_output=True,
             text=True,
             timeout=10,
@@ -81,7 +90,7 @@ class SingBoxAdapter(VPNAdapter):
             raise SingBoxError(f"sing-box rejected config: {check.stderr.strip() or check.stdout.strip()}")
 
         process = subprocess.Popen(
-            [self.binary, "run", "-c", str(config_path)],
+            command_prefix + [self.binary, "run", "-c", str(config_path)],
             stdout=log_file,
             stderr=subprocess.STDOUT,
             cwd=directory,
@@ -94,14 +103,16 @@ class SingBoxAdapter(VPNAdapter):
                 detail = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
                 shutil.rmtree(directory, ignore_errors=True)
                 raise SingBoxError(f"sing-box exited during startup: {detail}")
-            if _port_open("127.0.0.1", proxy_port):
+            proxy_host = namespace.namespace_ip if namespace else "127.0.0.1"
+            if _port_open(proxy_host, proxy_port):
                 return ConnectionHandle(
                     server_id=str(server["id"]),
                     metadata={
                         "process": process,
-                        "proxy_url": f"http://127.0.0.1:{proxy_port}",
-                        "socks_url": f"socks5://127.0.0.1:{proxy_port}",
+                        "proxy_url": f"http://{proxy_host}:{proxy_port}",
+                        "socks_url": f"socks5://{proxy_host}:{proxy_port}",
                         "directory": str(directory),
+                        "namespace": namespace,
                         "log_path": str(log_path),
                         "log_file": log_file,
                     },
@@ -111,6 +122,8 @@ class SingBoxAdapter(VPNAdapter):
         process.terminate()
         log_file.close()
         shutil.rmtree(directory, ignore_errors=True)
+        if namespace and self.namespace_manager:
+            self.namespace_manager.destroy(namespace)
         raise SingBoxError("Timed out waiting for sing-box proxy")
 
     def disconnect(self, handle: ConnectionHandle) -> None:
@@ -128,6 +141,9 @@ class SingBoxAdapter(VPNAdapter):
         directory = handle.metadata.get("directory")
         if directory:
             shutil.rmtree(directory, ignore_errors=True)
+        namespace = handle.metadata.get("namespace")
+        if namespace and self.namespace_manager:
+            self.namespace_manager.destroy(namespace)
 
 
 def build_config(uri: str, allow_extended_transports: bool = False) -> dict[str, Any]:
