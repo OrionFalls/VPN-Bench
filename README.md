@@ -2,389 +2,292 @@
 
 <div align="center">
 
-<img src="assets/logo.svg" alt="VPN-Bench" width="180">
+<img src="assets/logo.svg" alt="VPN-Bench" width="190">
 
-**Real-world VPN benchmarking & long-term connection monitoring**
+### Реальный бенчмарк VPN-серверов
 
-[![CI](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml/badge.svg)](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml) ![Python](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white) ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+**Импортируй подписки → быстро отсекай плохие узлы → тестируй лучшие → накапливай историю.**
 
-**🇷🇺 RU | [🇬🇧 EN](#english)**
+[![CI](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml/badge.svg)](https://github.com/OrionFalls/VPN-Bench/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.13%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue)](LICENSE)
+
+🇷🇺 **Русский** · [🇬🇧 English](README.en.md)
 
 </div>
 
-Self-hosted автоматический бенчмарк VPN-серверов и система долгосрочного мониторинга качества соединений.
-
-# 🇷🇺 Русская версия
-
-## Что это
-
-VPN-Bench предназначен для автоматического сравнения VPN-серверов не по простому ping до IP-адреса, а по реальному качеству соединения.
-
-Идея проекта:
-
-**подписка провайдера → импорт серверов → подключение через изолированное VPN-ядро → реальные сетевые проверки → сохранение результатов → история и аналитика.**
-
-Главная цель — получить воспроизводимые измерения, по которым можно сравнивать десятки и сотни серверов и затем длительно наблюдать за ними.
-
-## Текущий статус
-
-- веб-панель с первоначальной настройкой администратора;
-- авторизация и сессии;
-- шифрование URL подписок при хранении;
-- добавление VPN-провайдеров и автоматическое обновление подписок;
-- нормализация серверов в единую модель;
-- импорт Base64-подписок;
-- импорт VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, AnyTLS, SSH, SOCKS5 и NaiveProxy URI;
-- импорт sing-box JSON;
-- модель тестовых кампаний с живым прогрессом;
-- режимы **Equal Time** и **Sequential**;
-- регулярные выражения для фильтрации серверов;
-- SQLite для результатов и журналов;
-- реальные DNS/HTTP/TCP-пробы через VPN proxy;
-- измерение latency, jitter и packet loss;
-- отдельный privileged worker для запуска VPN-ядер;\n- controller без NET_ADMIN и worker с отдельной сетевой ролью;
-- Docker-развёртывание;
-- CI с Python-тестами и проверкой Docker-сборки;
-- одно-командная установка на отдельную Debian/Ubuntu VM.
-
-Проект находится в активной разработке: полноценные измерения скорости, whitelist-bypass, длительные stability-тесты и аналитика ещё расширяются.
-
-## VPN-ядра
-
-Архитектура специально не привязана к одному ядру.
-
-> **Runtime по умолчанию: LX + Extended + изолированный WireGuard adapter. Xray не входит в базовый Docker image и подключается как optional compatibility backend.**
-
-| Ядро | Назначение | Runtime |
-|---|---|---|
-| **sing-box-lx** | основной универсальный backend | ✅ |
-| **sing-box-extended** | дополнительные протоколы и fallback | ✅ |
-| **Xray** | резервная Xray-специфичная совместимость | optional |
-| upstream **sing-box** | baseline/reference для разработки | ❌ |
-
-LX становится основным runtime-ядром. Отдельный upstream sing-box в runtime не нужен: он остаётся baseline/reference только для разработки и проверки совместимости.
-
-Extended оставляем как специализированный fallback для протоколов и функций, которые выходят за пределы обычной sing-box/LX-модели. Xray — последний compatibility fallback.
-
-**Runtime-цепочка: LX → Extended → WireGuard adapter → optional Xray.** Это уменьшает размер образа и количество почти одинаковых бинарников, не закрывая доступ к редким протоколам.
-
-## Импорт подписок
-
-Подписка превращается в нормализованный объект:
-
-    Provider
-       |
-       v
-    Subscription
-       |
-       v
-    Parser
-       |
-       +--> VLESS
-       +--> VMess
-       +--> Trojan
-       +--> Shadowsocks
-       +--> Hysteria2
-       +--> sing-box JSON
-       |
-       v
-    Normalized Server
-       +--> protocol
-       +--> host
-       +--> port
-       +--> transport
-       +--> security
-       +--> metadata
-
-В дальнейшем importer будет расширяться за счёт форматов расширенных ядер, включая TUIC, AnyTLS, WireGuard/AmneziaWG, NaiveProxy, MASQUE и другие варианты.
-
-## Реальный тест соединения
-
-VPN-Bench не оценивает качество сервера по одному ping.
-
-Планируемые уровни проверки:
-
-1. запуск VPN в изолированном окружении;
-2. проверка установления соединения;
-3. DNS;
-4. TCP/TLS;
-5. HTTP/HTTPS;
-6. latency;
-7. jitter;
-8. packet loss;
-9. download/upload;
-10. whitelist-bypass;
-11. длительная стабильность.
-
-Первичный screening должен быть коротким, чтобы быстро проверять большое количество серверов. После screening только подходящие серверы переходят в длительный тест.
-
-## Режимы тестирования
-
-### Equal Time
-
-Общее время кампании делится между выбранными серверами. Например: **20 серверов × 60 секунд = около 20 минут на кампанию.**
-
-### Sequential
-
-Сервер тестируется до завершения заданного набора проверок, после чего запускается следующий.
-
-## Изоляция
-
-> Тест VPN никогда не должен ломать сеть самого benchmark-хоста.
-
-VPN-ядро не должно менять default route Proxmox VM, Docker host или основной OpenWrt router.
-
-Архитектура runtime:
-
-    VPN-Bench Controller
-            |
-       internal Docker network
-            |
-       Isolated Worker
-            |
-      per-job netns
-            |
-       +----+----+
-       |         |
-    sing-box   Xray
-       |         |
-       +----+----+
-            |
-        Test traffic
-
-Worker создаёт отдельный Linux network namespace и veth/NAT для каждого VPN-сеанса. VPN-core и TUN-интерфейсы остаются внутри этого namespace. Controller не получает NET_ADMIN.
-
-## Whitelist-bypass
-
-Whitelist-bypass — отдельный тип теста, а не часть обычного ping/speed benchmark.
-
-Для каждого whitelist-sensitive URL сначала выполняется контроль без VPN. Только если URL недоступен без VPN и доступен через VPN, результат считается подтверждённым bypass. Если URL доступен без VPN, результат помечается как `not_applicable`, а не как успешный обход.
-
-Так обычная доступность Интернета не смешивается с проверкой обхода whitelist-политики.
-
-## Скорость
-
-Непрерывный speedtest для каждого сервера не нужен и будет искажать картину.
-
-Планируется короткий throughput screening, фиксированные endpoint'ы, отдельные download/upload samples, длительный throughput только для отобранных серверов и повторение измерений в разное время суток.
-
-В идеале benchmark будет использовать собственный контролируемый VPS endpoint. Если он недоступен — fallback на публичные endpoints.
-
-## UI
-
-1. **Dashboard** — состояние системы, провайдеры, серверы и текущая кампания.
-2. **Providers** — подписки, обновление, срок действия и статистика.
-3. **Servers** — список серверов и параметры подключения.
-4. **Tests** — запуск кампаний, фильтры, длительность и live progress.
-5. **Analytics** — графики, история и сравнение результатов.
-6. **Logs** — технические события и диагностика.
-7. **Settings** — конфигурация, безопасность, хранилище и обновления.
-
-## Безопасность
-
-URL подписок не возвращаются обычным API списка провайдеров и хранятся в базе в зашифрованном виде. Ключ шифрования хранится отдельно через VPN_BENCH_SECRET.
-
-Для доступа из Интернета VPN-Bench следует размещать за HTTPS reverse proxy и ограничивать firewall.
-
-## Установка одной командой
-
-На отдельной Debian/Ubuntu VM:
-
-    curl -fsSL https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/install.sh | sudo bash
-
-Установщик устанавливает Docker, клонирует или обновляет репозиторий, создаёт конфигурацию, генерирует секрет, собирает image, запускает приложение, ждёт healthcheck и показывает адрес веб-панели.
-
-## Планируемая архитектура
-
-    Provider subscriptions
-             |
-             v
-    Subscription importer
-             |
-             v
-    Normalized server model
-             |
-             v
-    Capability detection
-             |
-       +-----+-----+
-       |     |     |
-       v     v     v
-   sing-box  lx  extended
-       |     |     |
-       +-----+-----+
-             |
-             v
-           Xray
-       (если требуется)
-             |
-             v
-      Isolated benchmark
-             |
-      +------+------+------+------+
-      |      |      |      |      |
-     DNS    HTTP   TCP/TLS Speed Whitelist
-             |
-             v
-        Measurements
-             |
-             v
-       SQLite / PostgreSQL
-             |
-             v
-          Web UI / API
-
-## Разработка
-
-    pip install -e .
-    pytest -q
-
-CI автоматически запускает тесты на Python 3.13 и проверяет сборку Docker image.
-
-## Репозиторий
-
-GitHub: https://github.com/OrionFalls/VPN-Bench
+> 🧪 **Статус:** active development. Архитектура и базовый runtime уже работают; методика измерений и аналитика продолжают развиваться.
 
 ---
 
-<a id="english"></a>
+## 🎯 Зачем это нужно?
 
-# 🇬🇧 English version
+Обычный speedtest отвечает на вопрос **«как быстро сейчас?»**.
 
-## What is VPN-Bench?
+VPN-Bench должен отвечать на более полезный вопрос:
 
-VPN-Bench is a self-hosted automated VPN server benchmark and long-term connection-quality monitoring system.
+> **«Как этот VPN-узел ведёт себя в реальной работе и как он ведёт себя через день, неделю и месяц?»**
 
-The project compares VPN servers using real network behaviour instead of relying on a simple ping to the VPN endpoint.
+Система не ограничивается ping до IP-адреса. Трафик тестируется через **реально поднятое VPN-соединение в изолированном network namespace**.
 
-Intended pipeline:
-
-**provider subscription → server import → isolated VPN core → real network probes → stored measurements → history and analytics.**
-
-## Current status
-
-- web panel with first-run administrator setup;
-- authentication and sessions;
-- encrypted subscription URLs at rest;
-- provider management and automatic subscription synchronization;
-- normalized server model;
-- Base64 subscription decoding;
-- VLESS, VMess, Trojan, Shadowsocks and Hysteria2 import;
-- sing-box JSON import;
-- live test campaign state;
-- **Equal Time** and **Sequential** scheduling;
-- regular-expression server filtering;
-- SQLite storage;
-- real DNS/HTTP/TCP probes through a VPN proxy;
-- latency, jitter and packet-loss measurements;
-- isolated VPN-core execution;
-- Docker deployment;
-- CI with Python tests and Docker image builds;
-- one-command Debian/Ubuntu VM installation.
-
-Throughput benchmarking, whitelist-bypass testing, long-term stability testing and analytics are still being expanded.
-
-## VPN cores
-
-| Core | Purpose | Runtime |
-|---|---|---|
-| **sing-box-lx** | primary general-purpose backend | ✅ |
-| **sing-box-extended** | extended protocol fallback | ✅ |
-| **Xray** | Xray-specific compatibility fallback | optional |
-| upstream **sing-box** | development/reference baseline | ❌ |
-
-LX is the primary runtime core. The upstream sing-box binary is not shipped in production; it remains a development/reference baseline.
-
-Extended is kept as a specialized fallback for additional protocols and features. Xray remains the final compatibility fallback.
-
-**Runtime strategy: LX → Extended → optional Xray.**
-
-## Real connection testing
-
-VPN-Bench is not intended to evaluate servers using a single ping.
-
-Planned checks:
-
-1. isolated VPN startup;
-2. connection establishment;
-3. DNS;
-4. TCP/TLS;
-5. HTTP/HTTPS;
-6. latency;
-7. jitter;
-8. packet loss;
-9. download/upload;
-10. whitelist-bypass;
-11. long-term stability.
-
-Initial screening should be short enough to process a large server pool efficiently. Only selected servers should proceed to long stability tests.
-
-## Isolation
-
-> A VPN test must never break the benchmark host's own network.
-
-The VPN core must not modify the default route of the Proxmox VM, Docker host or primary OpenWrt router.
-
-Only isolated workers should receive the network capabilities required by the VPN core. The controller, web UI and database should not receive NET_ADMIN unnecessarily.
-
-## One-command installation
-
-On a dedicated Debian/Ubuntu VM:
-
-    curl -fsSL https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/install.sh | sudo bash
-
-The installer installs Docker when needed, clones or updates the repository, creates configuration, generates the encryption secret, builds the image, starts the application, waits for health and prints the web-panel address.
-
-## Planned architecture
-
-    Provider subscriptions
-             |
-             v
-    Subscription importer
-             |
-             v
-    Normalized server model
-             |
-             v
-    Capability detection
-             |
-       +-----+-----+
-       |     |     |
-       v     v     v
-   sing-box  lx  extended
-       |     |     |
-       +-----+-----+
-             |
-             v
-           Xray
-             |
-             v
-      Isolated benchmark
-             |
-      +------+------+------+------+
-      |      |      |      |      |
-     DNS    HTTP   TCP/TLS Speed Whitelist
-             |
-             v
-        Measurements
-             |
-             v
-       SQLite / PostgreSQL
-             |
-             v
-          Web UI / API
-
-## Development
-
-    pip install -e .
-    pytest -q
-
-CI runs the Python 3.13 test suite and verifies the Docker image build.
-
-## Repository
-
-urlGitHub — OrionFalls/VPN-Benchhttps://github.com/OrionFalls/VPN-Bench
+![VPN-Bench architecture](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/architecture.svg)
 
 ---
 
-VPN-Bench is intended to become a reproducible VPN-node laboratory: fixed targets, consistent methodology, isolated execution, raw measurements and long-term history instead of subjective speed tests.
+## ✨ Что уже есть
+
+| | Возможность |
+|---|---|
+| 🔐 | Авторизация и первоначальная настройка администратора |
+| 🔗 | Добавление VPN-провайдеров по URL подписки |
+| 🔄 | Синхронизация и обновление подписок |
+| 📦 | Нормализация серверов в единую модель |
+| 🧩 | VLESS · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · AnyTLS · SSH · SOCKS5 · NaiveProxy |
+| 🗂️ | Base64-подписки и sing-box JSON |
+| 🧠 | Capability detection для доступных runtime-ядер |
+| 🧪 | Быстрый screening перед длительным тестом |
+| 📡 | DNS · TCP/TLS · HTTP/HTTPS |
+| 📊 | Latency · jitter · packet loss |
+| 🚀 | Throughput samples |
+| 🛡️ | Отдельная проверка whitelist-sensitive targets |
+| 📈 | История измерений и аналитика |
+| 🐳 | Docker deployment |
+| 🧱 | Изолированный privileged worker |
+| ❤️ | Healthchecks и CI |
+
+### VPN runtime
+
+**LX → Extended → WireGuard → optional Xray**
+
+- **sing-box-lx** — основной runtime;
+- **sing-box-extended** — fallback для расширенных возможностей;
+- **WireGuard** — отдельный стандартный adapter;
+- **Xray** — optional compatibility backend.
+
+---
+
+## 🧪 Как проходит тест
+
+![Benchmark flow](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/benchmark-flow.svg)
+
+### 1. 📥 Импорт
+
+VPN-Bench получает подписку и превращает её в нормализованный список серверов.
+
+### 2. ⚡ Screening
+
+Короткие проходы быстро отсеивают узлы, которые не устанавливают соединение, нестабильны или не проходят базовые проверки.
+
+### 3. 🔬 Полный тест
+
+Только выбранные серверы переходят в более длительное измерение.
+
+### 4. 📊 История
+
+Каждое измерение сохраняется. Со временем можно видеть не только разовый результат, но и стабильность узла.
+
+---
+
+## 🛡️ Изоляция — ключевой принцип
+
+VPN-тест **не должен ломать сеть самого VPN-Bench**.
+
+Controller работает без `NET_ADMIN`.
+
+Worker получает необходимые сетевые возможности и для каждого задания создаёт отдельный Linux network namespace:
+
+```text
+Controller
+    │
+    ▼
+Worker
+    │
+    ├── Job #1 → netns → VPN → probes
+    ├── Job #2 → netns → VPN → probes
+    └── Job #3 → netns → VPN → probes
+```
+
+VPN-core и TUN-интерфейс остаются внутри namespace. Основной маршрут хоста при этом не используется для VPN-туннеля.
+
+---
+
+## 🎯 Whitelist-bypass
+
+Это отдельная проверка, а не «ещё один ping».
+
+Логика:
+
+```text
+Target
+  │
+  ├── без VPN → доступен?
+  │       └── да → not_applicable
+  │
+  └── без VPN → недоступен
+          │
+          └── через VPN → доступен?
+                  ├── да → bypass confirmed
+                  └── нет → failed
+```
+
+Так обычная доступность сайта не смешивается с результатом проверки обхода.
+
+---
+
+## ⏱️ Режимы тестирования
+
+### ⚖️ Equal Time
+
+Общее время кампании распределяется между выбранными серверами.
+
+**Пример:** 20 серверов × 60 секунд ≈ 20 минут.
+
+### ▶️ Sequential
+
+Серверы проходят тест последовательно.
+
+---
+
+## 🖥️ Web UI
+
+| Раздел | Назначение |
+|---|---|
+| 🏠 **Dashboard** | состояние системы и текущая кампания |
+| 🔗 **Providers** | подписки и синхронизация |
+| 🖥️ **Servers** | импортированные узлы и capabilities |
+| 🧪 **Tests** | screening и полные тесты |
+| 📊 **Analytics** | накопленные результаты |
+| 📜 **Logs** | диагностика |
+| ⚙️ **Settings** | системные настройки |
+
+Интерфейс рассчитан на **desktop + tablet + mobile**.
+
+---
+
+## 🚀 Быстрый старт
+
+Рекомендуется отдельная Debian/Ubuntu VM.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/install.sh | sudo bash
+```
+
+Установщик:
+
+1. устанавливает Docker при необходимости;
+2. клонирует/обновляет репозиторий;
+3. создаёт конфигурацию;
+4. генерирует секрет;
+5. собирает контейнеры;
+6. запускает Controller + Worker;
+7. выполняет healthcheck;
+8. показывает адрес Web UI.
+
+> 💡 Для production-развёртывания лучше использовать отдельную VM/LXC и не размещать VPN-Bench непосредственно на основном OpenWrt.
+
+---
+
+## 🧱 Архитектура
+
+```text
+                  ┌─────────────────────┐
+                  │      Web UI         │
+                  │      FastAPI        │
+                  └──────────┬──────────┘
+                             │
+                  ┌──────────▼──────────┐
+                  │     Controller      │
+                  │     SQLite / API    │
+                  └──────────┬──────────┘
+                             │
+                  Docker internal network
+                             │
+                  ┌──────────▼──────────┐
+                  │       Worker        │
+                  │ NET_ADMIN + TUN     │
+                  └──────────┬──────────┘
+                             │
+                    isolated netns
+                             │
+              ┌──────────────▼──────────────┐
+              │        VPN runtime         │
+              │ LX / Extended / WG / Xray  │
+              └──────────────┬──────────────┘
+                             │
+                    real test traffic
+                             │
+              ┌──────────────▼──────────────┐
+              │ DNS · HTTP · TCP · Speed    │
+              │ Latency · Loss · Bypass     │
+              └─────────────────────────────┘
+```
+
+---
+
+## 🔒 Безопасность
+
+- URL подписок хранятся в зашифрованном виде.
+- Ключ шифрования задаётся через `VPN_BENCH_SECRET`.
+- Controller не получает `NET_ADMIN`.
+- VPN-сеансы запускаются в отдельных network namespaces.
+- Для доступа извне рекомендуется HTTPS reverse proxy + firewall.
+
+---
+
+## 🛠️ Разработка
+
+```bash
+git clone https://github.com/OrionFalls/VPN-Bench.git
+cd VPN-Bench
+
+pip install -e .
+pytest -q
+```
+
+Docker:
+
+```bash
+docker compose up -d --build
+```
+
+CI проверяет Python-тесты, браузерный JavaScript и Docker image.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Controller / Worker architecture
+- [x] Isolated VPN runtime
+- [x] Provider subscriptions
+- [x] Server normalization
+- [x] Basic network probes
+- [x] Screening campaigns
+- [x] Mobile-responsive UI
+- [ ] 📈 Полноценная аналитика и графики
+- [ ] 🚀 Controlled throughput benchmark
+- [ ] 🛡️ Расширенный whitelist-bypass benchmark
+- [ ] 🕐 Long-term stability campaigns
+- [ ] 🗄️ PostgreSQL backend
+- [ ] 📤 Экспорт результатов
+- [ ] 🔔 Уведомления о деградации серверов
+
+---
+
+## 🤝 Идея проекта
+
+VPN-Bench создаётся как **лаборатория для воспроизводимого тестирования VPN**, а не как очередной «speedtest на один раз».
+
+Фиксированные targets → одинаковая методика → изолированное выполнение → сырые измерения → история.
+
+**Меньше субъективности. Больше данных.**
+
+---
+
+<div align="center">
+
+**⚡ VPN-Bench**
+
+[GitHub](https://github.com/OrionFalls/VPN-Bench) · GPL-3.0
+
+</div>
