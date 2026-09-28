@@ -10,6 +10,7 @@ from typing import Any, Callable
 
 from .adapters.extended import SingBoxExtendedAdapter, SingBoxLXAdapter
 from .adapters.xray import XrayAdapter
+from .adapters.wireguard import WireGuardAdapter
 from .proxied_probes import measure_whitelist_baseline, run_proxy_probe
 from .capabilities import preferred_cores
 
@@ -39,12 +40,17 @@ class BenchmarkEngine:
         self.xray_adapter = XrayAdapter(
             binary=os.environ.get("VPN_BENCH_XRAY", "xray")
         )
+        self.wireguard_adapter = WireGuardAdapter(
+            binary=os.environ.get("VPN_BENCH_WG_QUICK", "wg-quick"),
+            proxy_binary=os.environ.get("VPN_BENCH_SING_BOX_LX", "sing-box-lx"),
+        )
 
     def _adapters_for(self, server: dict[str, Any]):
         names = preferred_cores(server.get("protocol"), server.get("transport"))
         adapters = {
             "sing-box-lx": self.lx_adapter,
             "sing-box-extended": self.extended_adapter,
+            "wireguard-tools": self.wireguard_adapter,
             "xray": self.xray_adapter,
         }
         return tuple(adapters[name] for name in names)
