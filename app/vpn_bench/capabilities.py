@@ -7,6 +7,8 @@ when the current adapter can actually build its configuration.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
+import shutil
 
 
 @dataclass(frozen=True)
@@ -66,7 +68,9 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
     extended = protocol in EXTENDED_PROTOCOLS and transport in EXTENDED_TRANSPORTS
     wireguard = protocol == "wireguard" and transport in WIREGUARD_TRANSPORTS
     amneziawg = protocol == "amneziawg" and transport in WIREGUARD_TRANSPORTS
-    xray = protocol in XRAY_PROTOCOLS and transport in XRAY_TRANSPORTS
+    xray_binary = os.environ.get("VPN_BENCH_XRAY_BINARY", "xray")
+    xray_available = shutil.which(xray_binary) is not None
+    xray = xray_available and protocol in XRAY_PROTOCOLS and transport in XRAY_TRANSPORTS
 
     return (
         CoreCapability(
@@ -102,7 +106,11 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
             xray,
             "supported by the Xray compatibility adapter"
             if xray
-            else "not supported by the current Xray adapter",
+            else (
+                "Xray binary is not installed"
+                if not xray_available
+                else "not supported by the current Xray adapter"
+            ),
         ),
     )
 
