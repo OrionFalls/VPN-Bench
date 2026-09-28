@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS test_results (
     upload_mbps REAL,
     dns_ok INTEGER,
     http_ok INTEGER,
+    whitelist_ok INTEGER,
     details_json TEXT,
     FOREIGN KEY(run_id) REFERENCES test_runs(id) ON DELETE SET NULL,
     FOREIGN KEY(server_id) REFERENCES servers(id) ON DELETE CASCADE
@@ -134,6 +135,7 @@ def initialize(path: str | Path) -> None:
         _ensure_column(connection, "servers", "transport", "TEXT")
         _ensure_column(connection, "servers", "security", "TEXT")
         _ensure_column(connection, "test_results", "run_id", "TEXT")
+        _ensure_column(connection, "test_results", "whitelist_ok", "INTEGER")
 
 
 def _ensure_column(connection: sqlite3.Connection, table: str, column: str, definition: str) -> None:
