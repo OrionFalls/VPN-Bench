@@ -1,5 +1,3 @@
-FROM ghcr.io/sagernet/sing-box:v1.14.2 AS singbox
-
 FROM ghcr.io/xtls/xray-core:26.9.8 AS xray
 
 FROM debian:bookworm-slim AS cores
@@ -29,7 +27,6 @@ FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    VPN_BENCH_SING_BOX=/usr/local/bin/sing-box \
     VPN_BENCH_SING_BOX_LX=/usr/local/bin/sing-box-lx \
     VPN_BENCH_SING_BOX_EXTENDED=/usr/local/bin/sing-box-extended \
     VPN_BENCH_XRAY=/usr/local/bin/xray
@@ -40,7 +37,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=singbox /usr/local/bin/sing-box /usr/local/bin/sing-box
 COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
 COPY --from=cores /usr/local/bin/sing-box-lx /usr/local/bin/sing-box-lx
 COPY --from=cores /usr/local/bin/sing-box-extended /usr/local/bin/sing-box-extended
