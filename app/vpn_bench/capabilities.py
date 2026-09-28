@@ -34,7 +34,6 @@ LX_PROTOCOLS = {
 LX_TRANSPORTS = {
     "tcp",
     "udp",
-    "udp",
     "ws",
     "websocket",
     "grpc",
@@ -51,6 +50,9 @@ LX_TRANSPORTS = {
 EXTENDED_PROTOCOLS = set(LX_PROTOCOLS)
 EXTENDED_TRANSPORTS = set(LX_TRANSPORTS)
 
+WIREGUARD_PROTOCOLS = {"wireguard"}
+WIREGUARD_TRANSPORTS = {"udp"}
+
 XRAY_PROTOCOLS = {"vless"}
 XRAY_TRANSPORTS = {"tcp", "raw", "ws", "websocket", "grpc", "xhttp", "httpupgrade"}
 
@@ -61,6 +63,7 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
 
     lx = protocol in LX_PROTOCOLS and transport in LX_TRANSPORTS
     extended = protocol in EXTENDED_PROTOCOLS and transport in EXTENDED_TRANSPORTS
+    wireguard = protocol in WIREGUARD_PROTOCOLS and transport in WIREGUARD_TRANSPORTS
     xray = protocol in XRAY_PROTOCOLS and transport in XRAY_TRANSPORTS
 
     return (
@@ -77,6 +80,13 @@ def detect_capabilities(protocol: str | None, transport: str | None) -> tuple[Co
             "supported by the current Extended adapter"
             if extended
             else "requires an adapter/config generator not implemented yet",
+        ),
+        CoreCapability(
+            "wireguard-tools",
+            wireguard,
+            "supported by the isolated wg-quick adapter"
+            if wireguard
+            else "not supported by the current WireGuard adapter",
         ),
         CoreCapability(
             "xray",
