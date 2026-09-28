@@ -32,7 +32,7 @@ VPN-Bench предназначен для автоматического сра�
 - добавление VPN-провайдеров и автоматическое обновление подписок;
 - нормализация серверов в единую модель;
 - импорт Base64-подписок;
-- импорт VLESS, VMess, Trojan, Shadowsocks и Hysteria2;
+- импорт VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, AnyTLS, SSH, SOCKS5 и NaiveProxy URI;
 - импорт sing-box JSON;
 - модель тестовых кампаний с живым прогрессом;
 - режимы **Equal Time** и **Sequential**;
