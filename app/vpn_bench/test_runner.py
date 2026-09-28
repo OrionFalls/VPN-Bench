@@ -85,7 +85,7 @@ class TestRunManager:
         planned_seconds: float,
         scheduling_mode: str,
         server_names: dict[str, str] | None = None,
-        on_server: Callable[[str], bool] | None = None,
+        on_server: Callable[[str, float, threading.Event], bool] | None = None,
     ) -> TestRunState:
         if not server_ids:
             raise ValueError("At least one server must be selected.")
@@ -142,7 +142,7 @@ class TestRunManager:
         stop_event: threading.Event,
         server_ids: list[str],
         server_names: dict[str, str],
-        on_server: Callable[[str], bool] | None,
+        on_server: Callable[[str, float, threading.Event], bool] | None,
     ) -> None:
         slot_seconds = state.planned_seconds / len(server_ids)
         try:
@@ -156,7 +156,7 @@ class TestRunManager:
                 state.message = f"Testing {state.current_server_name}"
 
                 if on_server is not None:
-                    success = on_server(server_id)
+                    allocation = slot_seconds if state.scheduling_mode == "equal_time" else max(0.0, state.planned_seconds - state.elapsed_seconds)\n                    success = on_server(server_id, allocation, stop_event)
                 else:
                     success = self._wait_slot(stop_event, slot_seconds)
 
