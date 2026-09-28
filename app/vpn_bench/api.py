@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from .config import Config
+from .capabilities import detect_capabilities
 from .benchmark import BenchmarkEngine
 from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
@@ -169,7 +170,12 @@ def build_app(config: Config) -> FastAPI:
                 "SELECT id, name, display_name, enabled, metadata_json, last_updated_at, created_at "
                 "FROM providers ORDER BY COALESCE(display_name, name)"
             ).fetchall()
-        return [dict(row) | {"metadata": json_loads(row["metadata_json"])} for row in rows]
+        return [
+            dict(row)
+            | {"metadata": json_loads(row["metadata_json"])}
+            | {"capabilities": [item.__dict__ for item in detect_capabilities(row["protocol"], row["transport"])]}
+            for row in rows
+        ]
 
     @app.post("/api/v1/providers")
     def add_provider(payload: ProviderRequest, _: str = Depends(require_auth)) -> dict:
