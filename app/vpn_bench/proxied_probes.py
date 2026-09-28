@@ -74,6 +74,7 @@ def run_proxy_probe(
     timeout: float = 8.0,
     throughput_url: str | None = None,
     throughput_duration_seconds: float = 0.0,
+    whitelist_targets: list[str] | None = None,
 ) -> ProxyProbeResult:
     latency_samples: list[float] = []
     failures = 0
@@ -92,6 +93,11 @@ def run_proxy_probe(
         timeout=timeout,
     )
     http_ok, http_latency, http_status = http_head(target, proxy_url, timeout)
+    whitelist_results: list[dict[str, Any]] = []
+    for whitelist_target in whitelist_targets or []:
+        ok, latency, status = http_head(whitelist_target, proxy_url, timeout)
+        whitelist_results.append({"target": whitelist_target, "ok": ok, "latency_ms": latency, "status": status})
+
     throughput = None
     if throughput_url and throughput_duration_seconds > 0:
         throughput = download_sample(
@@ -125,5 +131,7 @@ def run_proxy_probe(
             "attempts": attempts,
             "latency_samples_ms": latency_samples,
             "throughput": throughput,
+            "whitelist": whitelist_results,
+            "whitelist_ok": bool(whitelist_results) and all(item["ok"] for item in whitelist_results),
         },
     )
