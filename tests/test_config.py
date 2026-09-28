@@ -23,3 +23,5 @@ providers:
     assert config.app.port == 9000
     assert config.providers[0].name == "test"
     assert config.providers[0].enabled is True
+    assert config.benchmark.default_mode == "equal_time"
+    assert config.benchmark.default_duration_seconds == 600
