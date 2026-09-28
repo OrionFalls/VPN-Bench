@@ -22,6 +22,7 @@ class BenchmarkEngine:
         http_targets: list[str] | None = None,
         dns_domain: str = "example.com",
         throughput_download_url: str | None = None,
+        throughput_upload_url: str | None = None,
         throughput_sample_seconds: int = 0,
         whitelist_targets: list[str] | None = None,
     ) -> None:
@@ -29,6 +30,7 @@ class BenchmarkEngine:
         self.http_targets = http_targets or ["https://example.com/"]
         self.dns_domain = dns_domain
         self.throughput_download_url = throughput_download_url
+        self.throughput_upload_url = throughput_upload_url
         self.throughput_sample_seconds = max(0, throughput_sample_seconds)
         self.whitelist_targets = whitelist_targets or []
         self.extended_adapter = SingBoxExtendedAdapter(
@@ -90,6 +92,7 @@ class BenchmarkEngine:
                     self.http_targets,
                     dns_domain=self.dns_domain,
                     throughput_url=self.throughput_download_url,
+                    throughput_upload_url=self.throughput_upload_url,
                     throughput_duration_seconds=self.throughput_sample_seconds,
                     whitelist_targets=self.whitelist_targets,
                     whitelist_baseline=whitelist_baseline,
