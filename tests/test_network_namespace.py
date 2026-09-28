@@ -26,3 +26,21 @@ def test_namespace_manager_allocates_routed_30(monkeypatch):
     assert ["iptables", "-t", "nat", "-A", "POSTROUTING", "-s", ns.subnet, "-o", "eth0", "-j", "MASQUERADE"] in calls
 
     manager.destroy(ns)
+
+
+def test_nat_uses_pinned_uplink(monkeypatch):
+    manager = NamespaceManager()
+    commands = []
+
+    monkeypatch.setattr(manager, "_run", lambda args, check=True: commands.append(args))
+
+    ns = type("NS", (), {
+        "subnet": "10.250.4.0/30",
+        "uplink": "eth9",
+    })()
+
+    manager._add_nat(ns)
+    manager._delete_nat(ns)
+
+    assert commands[0][8:10] == ["-o", "eth9"]
+    assert commands[1][8:10] == ["-o", "eth9"]
