@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS servers (
     transport TEXT,
     security TEXT,
     metadata_json TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    last_seen_at TEXT,
     FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL
 );
 
@@ -134,6 +136,8 @@ def initialize(path: str | Path) -> None:
         _ensure_column(connection, "servers", "provider_id", "TEXT")
         _ensure_column(connection, "servers", "transport", "TEXT")
         _ensure_column(connection, "servers", "security", "TEXT")
+        _ensure_column(connection, "servers", "active", "INTEGER NOT NULL DEFAULT 1")
+        _ensure_column(connection, "servers", "last_seen_at", "TEXT")
         _ensure_column(connection, "test_results", "run_id", "TEXT")
         _ensure_column(connection, "test_results", "whitelist_ok", "INTEGER")
 
