@@ -16,6 +16,7 @@ from .config import Config
 from cryptography.fernet import Fernet
 from .db import connect, get_meta, initialize, json_loads, set_meta
 from .security import create_session_token, hash_password, verify_password
+from .subscription import SubscriptionError, fetch_subscription, parse_subscription
 from .test_runner import TestRunManager
 from .ui import page
 
@@ -23,11 +24,19 @@ from .ui import page
 SESSION_DAYS = 7
 
 
-def encrypt_subscription_url(url: str) -> str:
+def _secret_box() -> Fernet:
     key = os.environ.get("VPN_BENCH_SECRET")
     if not key:
         raise RuntimeError("VPN_BENCH_SECRET is not configured")
-    return Fernet(key.encode()).encrypt(url.encode()).decode()
+    return Fernet(key.encode())
+
+
+def encrypt_subscription_url(url: str) -> str:
+    return _secret_box().encrypt(url.encode()).decode()
+
+
+def decrypt_subscription_url(value: str) -> str:
+    return _secret_box().decrypt(value.encode()).decode()
 
 
 def utc_now() -> str:
@@ -52,7 +61,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class ProviderRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(default="", max_length=200)
     display_name: str | None = Field(default=None, max_length=200)
     subscription_url: str = Field(min_length=1, max_length=4096)
     enabled: bool = True
@@ -174,6 +183,62 @@ def build_app(config: Config) -> FastAPI:
             )
         return {"id": provider_id, "name": payload.name, "display_name": payload.display_name}
 
+    @app.post("/api/v1/providers/{provider_id}/sync")
+    def sync_provider(provider_id: str, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            provider = connection.execute(
+                "SELECT id, name, display_name, subscription_url_encrypted FROM providers WHERE id = ?",
+                (provider_id,),
+            ).fetchone()
+        if not provider:
+            raise HTTPException(status_code=404, detail="Provider not found")
+
+        try:
+            url = decrypt_subscription_url(provider["subscription_url_encrypted"])
+            body, headers = fetch_subscription(url)
+            imported = parse_subscription(body)
+        except SubscriptionError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        provider_name = provider["name"]
+        if not provider_name or provider_name == "Определяется":
+            from urllib.parse import urlsplit
+            provider_name = urlsplit(url).hostname or "Provider"
+
+        metadata = _subscription_metadata(headers)
+        now = utc_now()
+        with db() as connection:
+            connection.execute("DELETE FROM servers WHERE provider_id = ?", (provider_id,))
+            for server in imported:
+                import json
+                connection.execute(
+                    "INSERT INTO servers(id, provider_id, provider, name, protocol, host, port, transport, security, metadata_json) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        server.id,
+                        provider_id,
+                        provider_name,
+                        server.name,
+                        server.protocol,
+                        server.host,
+                        server.port,
+                        server.transport,
+                        server.security,
+                        json.dumps(server.raw, ensure_ascii=False),
+                    ),
+                )
+            connection.execute(
+                "UPDATE providers SET name = ?, metadata_json = ?, last_updated_at = ? WHERE id = ?",
+                (provider_name, json.dumps(metadata, ensure_ascii=False), now, provider_id),
+            )
+        return {
+            "provider_id": provider_id,
+            "name": provider_name,
+            "servers": len(imported),
+            "metadata": metadata,
+            "updated_at": now,
+        }
+
     @app.get("/api/v1/servers")
     def servers(_: str = Depends(require_auth)) -> list[dict]:
         with db() as connection:
@@ -279,6 +344,26 @@ def build_app(config: Config) -> FastAPI:
         }
 
     return app
+
+
+def _subscription_metadata(headers: dict[str, str]) -> dict:
+    raw = headers.get("subscription-userinfo", "")
+    values = {}
+    for item in raw.split(";"):
+        if "=" in item:
+            key, value = item.split("=", 1)
+            values[key.strip()] = value.strip()
+    metadata = {}
+    for key in ("upload", "download", "total", "expire"):
+        if key in values:
+            try:
+                metadata[key] = int(values[key])
+            except ValueError:
+                metadata[key] = values[key]
+    for key in ("profile-title", "profile-update-interval"):
+        if key in headers:
+            metadata[key] = headers[key]
+    return metadata
 
 
 def _create_session(connection: sqlite3.Connection, response: Response) -> dict:
