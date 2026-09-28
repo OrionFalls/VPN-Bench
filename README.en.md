@@ -33,7 +33,7 @@ VPN-Bench is designed to answer:
 
 Instead of relying on a single ping to the VPN endpoint, traffic is tested through a **real VPN connection inside an isolated network namespace**.
 
-![VPN-Bench architecture](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/architecture.svg)
+![VPN-Bench architecture](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/architecture-en.svg)
 
 ---
 
@@ -71,7 +71,7 @@ Instead of relying on a single ping to the VPN endpoint, traffic is tested throu
 
 ## 🧪 How a benchmark works
 
-![Benchmark flow](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/benchmark-flow.svg)
+![Benchmark flow](https://raw.githubusercontent.com/OrionFalls/VPN-Bench/main/assets/readme/benchmark-flow-en.svg)
 
 ### 1. 📥 Import
 
