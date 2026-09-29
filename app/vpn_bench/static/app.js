@@ -158,43 +158,52 @@ function metric(label,value,unit,kind){
 }
 function resultStatus(v){return v===true?'<span class="ok">Доступен</span>':v===false?'<span class="err">Недоступен</span>':'—'}
 function serverDetail(){var s=state.serverDetail;if(!s)return;var rs=s.results||[],latest=rs[0]||{};var name=esc(s.name),title=flag(s.name)+" "+name;var speedData=rs.slice().reverse().map(function(r){return {download_mbps:r.download_mbps,upload_mbps:r.upload_mbps}});var lossData=rs.slice().reverse().map(function(r){return {download_mbps:r.latency_ms,upload_mbps:r.packet_loss_percent}});app.innerHTML='<div class="detail-head"><button class="back" onclick="state.page=\'servers\';render()">← Серверы</button><div class="server-title"><div class="big-flag">'+flag(s.name)+'</div><div><h1>'+name+'</h1><div class="muted">'+esc(s.provider)+' · '+esc(s.protocol||"—")+' · '+esc(s.transport||"—")+' · '+esc(s.security||"—")+'</div></div></div><div class="head-actions"><button class="btn" onclick="state.selected={};state.selected[\''+s.id+'\']=true;state.page=\'tests\';render()">Запустить тест</button><button class="icon-btn">⋮</button></div></div><div class="tabs"><button class="active">Обзор</button><button>Графики</button><button>История тестов</button><button>Технические данные</button><button>Логи</button></div><div class="detail-grid"><div class="card metrics-card"><div class="card-head"><h3>Текущие показатели</h3><span>'+badge(s.active?"Онлайн":"Неактивен",s.active?"good":"bad")+'</span></div>'+metric("Задержка",num(latest.latency_ms,0),"ms","blue")+metric("Скорость загрузки",num(latest.download_mbps,0),"Мбит/с","cyan")+metric("Скорость отдачи",num(latest.upload_mbps,0),"Мбит/с","green")+metric("Потери пакетов",num(latest.packet_loss_percent,1),"%","red")+metric("Стабильность",latest.success==null?"—":latest.success?"99.9%":"0%","",latest.success?"green":"red")+metric("Jitter",num(latest.jitter_ms,0),"ms","violet")+metric("DNS",resultStatus(latest.dns_ok),"","blue")+metric("HTTP",resultStatus(latest.http_ok),"","cyan")+'<div class="service-list"><span>'+statusDot(true)+'YouTube <b>'+resultStatus((latest.details||{}).youtube_ok)+'</b></span><span>'+statusDot(true)+'Telegram <b>'+resultStatus((latest.details||{}).telegram_ok)+'</b></span><span>'+statusDot(true)+'GitHub <b>'+resultStatus((latest.details||{}).github_ok)+'</b></span></div></div><div><div class="card chart-card"><div class="card-head"><div><h3>Скорость</h3><span class="muted">Последние измерения</span></div><div class="chart-legend"><span><i class="legend-dot blue-dot"></i>Загрузка</span><span><i class="legend-dot green-dot"></i>Отдача</span></div></div>'+miniChart(speedData,700,230)+'</div><div class="card chart-card" style="margin-top:16px"><div class="card-head"><div><h3>Задержка и потери пакетов</h3><span class="muted">Последние измерения</span></div></div>'+miniChart(lossData,700,180)+'</div></div></div>'}
+function setAnalyticsMetric(metric){state.analyticsMetric=metric;render()}
 function analytics(){
-  var rows=[];
-  var metric=state.analyticsMetric;
-  var period=state.analyticsPeriod;
-  var metricLabel={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"}[metric];
-  api("/api/v1/analytics").then(function(data){
-    rows=data||[];
+  var metric=state.analyticsMetric, period=state.analyticsPeriod;
+  var labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"};
+  var metricLabel=labels[metric]||labels.speed;
+  api("/api/v1/analytics").then(function(rows){
+    rows=rows||[];
     var selected=state.analyticsSelected.filter(function(id){return rows.some(function(r){return r.id===id})}).slice(0,5);
     state.analyticsSelected=selected;
-    var values=function(r){
-      if(metric==="speed")return {a:r.download_mbps,b:r.upload_mbps,au:"Мбит/с",bu:"Мбит/с"};
-      if(metric==="latency")return {a:r.latency_ms,b:r.jitter_ms,au:"ms",bu:"jitter"};
-      if(metric==="loss")return {a:r.packet_loss_percent,b:null,au:"%",bu:""};
-      if(metric==="availability")return {a:r.availability,b:null,au:"%",bu:""};
-      return {a:r.samples,b:null,au:"проверок",bu:""};
-    };
-    var options=rows.map(function(r){return '<option value="'+esc(r.id)+'" '+(selected.indexOf(r.id)>=0?"selected":"")+'>'+esc(r.provider)+" · "+esc(r.name)+'</option>'}).join("");
+    function value(r){
+      if(metric==="speed")return {a:r.download_mbps,b:r.upload_mbps,unit:"Мбит/с",second:"Upload"};
+      if(metric==="latency")return {a:r.latency_ms,b:r.jitter_ms,unit:"ms",second:"Jitter"};
+      if(metric==="loss")return {a:r.packet_loss_percent,b:null,unit:"%",second:""};
+      if(metric==="availability")return {a:r.availability,b:null,unit:"%",second:""};
+      return {a:r.samples,b:null,unit:"проверок",second:""};
+    }
+    var options=rows.map(function(r){
+      return '<option value="'+esc(r.id)+'" '+(selected.indexOf(r.id)>=0?"selected":"")+'>'+esc(r.provider)+" · "+esc(r.name)+'</option>';
+    }).join("");
+    var data=selected.length?selected.map(function(id){return rows.find(function(r){return r.id===id})}).filter(Boolean):rows.slice(0,8);
+    var max=1;
+    data.forEach(function(r){var v=value(r).a;if(v!=null)max=Math.max(max,Number(v)||0)});
+    var bars=data.map(function(r){
+      var v=value(r),pct=v.a==null?0:Math.max(4,Math.round(Number(v.a)/max*100));
+      return '<div class="metric-bar"><div><span>'+esc(r.name)+'</span><b>'+num(v.a,metric==="loss"||metric==="availability"?1:0)+(v.unit?" "+v.unit:"")+'</b></div><div class="bar-track"><i style="width:'+pct+'%"></i></div></div>';
+    }).join("");
     var cards=selected.map(function(id){
-      var r=rows.find(function(x){return x.id===id})||{};
-      var v=values(r);
-      return '<div class="compare-metric"><b>'+esc(r.name||"—")+'</b><div class="compare-value"><span>'+metricLabel+'</span><strong>'+num(v.a,metric==="availability"||metric==="loss"?1:0)+(v.au?" "+v.au:"")+'</strong></div>'+(v.b!=null?'<div class="compare-value"><span>'+esc(v.bu)+'</span><strong>'+num(v.b,1)+'</strong></div>':"")+'</div>';
+      var r=rows.find(function(x){return x.id===id})||{},v=value(r);
+      return '<div class="compare-metric"><b>'+esc(r.name||"—")+'</b><div class="compare-value"><span>'+metricLabel+'</span><strong>'+num(v.a,1)+(v.unit?" "+v.unit:"")+'</strong></div>'+(v.b!=null?'<div class="compare-value"><span>'+esc(v.second)+'</span><strong>'+num(v.b,1)+' ms</strong></div>':"")+'</div>';
     }).join("");
     var table=selected.map(function(id){
       var r=rows.find(function(x){return x.id===id})||{};
       return '<tr><td>'+esc(r.provider)+'</td><td>'+esc(r.name)+'</td><td>'+num(r.download_mbps,0)+'</td><td>'+num(r.upload_mbps,0)+'</td><td>'+num(r.latency_ms,1)+'</td><td>'+num(r.jitter_ms,1)+'</td><td>'+num(r.packet_loss_percent,2)+'</td><td>'+num(r.availability,1)+'%</td></tr>';
     }).join("");
-    var chartData=selected.length?selected.map(function(id){return rows.find(function(x){return x.id===id})}).filter(Boolean):rows.slice(0,8);
-    var max=1;
-    chartData.forEach(function(r){var v=values(r).a;if(v!=null)max=Math.max(max,Number(v)||0)});
-    var bars=chartData.map(function(r){
-      var v=values(r).a;
-      var pct=v==null?0:Math.max(4,Math.round(Number(v)/max*100));
-      return '<div class="metric-bar"><div><span>'+esc(r.name)+'</span><b>'+num(v,metric==="loss"||metric==="availability"?1:0)+(values(r).au?" "+values(r).au:"")+'</b></div><div class="bar-track"><i style="width:'+pct+'%"></i></div></div>';
-    }).join("");
+    var tabs=["speed","latency","loss","availability","sites"].map(function(k){return '<button class="'+(metric===k?"active":"")+'" onclick="setAnalyticsMetric(&quot;'+k+'&quot;)">'+labels[k]+'</button>'}).join("");
     app.innerHTML=head("Графики / Сравнение","История показателей и сопоставление серверов")+
-      '<div class="card analytics-card"><div class="analytics-toolbar"><select class="input" onchange="state.analyticsMetric=this.value;render()" title="Что именно измеряем"><option value="speed" '+(metric==="speed"?"selected":"")+'>Скорость</option><option value="latency" '+(metric==="latency"?"selected":"")+'>Задержка</option><option value="loss" '+(metric==="loss"?"selected":"")+'>Потери пакетов</option><option value="availability" '+(metric==="availability"?"selected":"")+'>Доступность</option><option value="sites" '+(metric==="sites"?"selected":"")+'>Сайты</option></select><select class="input" onchange="state.analyticsPeriod=this.value;render()" title="Период анализа"><option value="24h" '+(period==="24h"?"selected":"")+'>24 часа</option><option value="7d" '+(period==="7d"?"selected":"")+'>7 дней</option><option value="30d" '+(period==="30d"?"selected":"")+'>30 дней</option></select><select class="input" multiple size="1" onchange="state.analyticsSelected=Array.from(this.selectedOptions).map(function(o){return o.value}).slice(0,5);render()" title="Выберите до 5 серверов">'+options+'</select></div>'+
-      '<div class="analytics-tabs">'+["speed","latency","loss","availability","sites"].map(function(k){var labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"};return '<button class="'+(metric===k?"active":"")+'" onclick="state.analyticsMetric=''+k+'';render()">'+labels[k]+'</button>}).join("")+'</div>'+
+      '<div class="card analytics-card"><div class="analytics-toolbar">'+
+      '<select class="input" onchange="setAnalyticsMetric(this.value)" title="Выбор показателя">'+
+      '<option value="speed" '+(metric==="speed"?"selected":"")+'>Скорость</option>'+
+      '<option value="latency" '+(metric==="latency"?"selected":"")+'>Задержка</option>'+
+      '<option value="loss" '+(metric==="loss"?"selected":"")+'>Потери пакетов</option>'+
+      '<option value="availability" '+(metric==="availability"?"selected":"")+'>Доступность</option>'+
+      '<option value="sites" '+(metric==="sites"?"selected":"")+'>Сайты</option></select>'+
+      '<select class="input" onchange="state.analyticsPeriod=this.value;render()" title="Период анализа"><option value="24h" '+(period==="24h"?"selected":"")+'>24 часа</option><option value="7d" '+(period==="7d"?"selected":"")+'>7 дней</option><option value="30d" '+(period==="30d"?"selected":"")+'>30 дней</option></select>'+
+      '<select class="input" multiple size="1" onchange="state.analyticsSelected=Array.from(this.selectedOptions).map(function(o){return o.value}).slice(0,5);render()" title="Можно выбрать до 5 серверов">'+options+'</select></div>'+
+      '<div class="analytics-tabs">'+tabs+'</div>'+
       '<div class="card large-chart"><div class="card-head"><div><h3>'+metricLabel+'</h3><span class="muted">Период: '+period+' · одинаковая шкала для выбранных серверов</span></div></div><div class="metric-bars">'+(bars||'<div class="empty">Недостаточно данных для графика</div>')+'</div></div>'+
       '<div class="card compare-card"><div class="card-head"><div><h3>Сравнение</h3><span class="muted">Не более 5 серверов одновременно</span></div></div><div class="compare-grid">'+(cards||'<div class="empty-chip">Выберите серверы для сравнения</div>')+'</div></div>'+
       '<div class="card table-card"><div class="card-head"><h3>Сводная таблица</h3></div><div class="table-scroll"><table class="table analytics-table"><thead><tr><th>Провайдер</th><th>Сервер</th><th>Download</th><th>Upload</th><th>Ping</th><th>Jitter</th><th>Loss</th><th>Доступность</th></tr></thead><tbody>'+(table||'<tr><td colspan="8" class="empty">Выберите серверы</td></tr>')+'</tbody></table></div></div></div>';
