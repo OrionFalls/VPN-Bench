@@ -183,7 +183,8 @@ def build_app(config: Config) -> FastAPI:
         result = []
         for row in rows:
             item = dict(row) | {"metadata": json_loads(row["metadata_json"])}
-            raw_url = decrypt_subscription_url(row["subscription_url_encrypted"])\n            item["subscription_url_masked"] = raw_url[:12] + "••••" if len(raw_url) > 16 else "••••"\n            item.pop("subscription_url_encrypted", None)
+            raw_url = decrypt_subscription_url(row["subscription_url_encrypted"])
+            item["subscription_url_masked"] = raw_url[:12] + "••••" if len(raw_url) > 16 else "••••"
             item.pop("subscription_url_encrypted", None)
             result.append(item)
         return result
