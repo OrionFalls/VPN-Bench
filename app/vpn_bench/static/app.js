@@ -187,7 +187,7 @@ function serverDetail(){
 
 function setAnalyticsMetric(metric){state.analyticsMetric=metric;render()}
 async function analytics(){
-  var metric=state.analyticsMetric,period=state.analyticsPeriod,labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"};
+  var metric=state.analyticsMetric,period=state.analyticsPeriod,labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность"};
   var rows=await api("/api/v1/analytics?period="+encodeURIComponent(period))||[];
   var selected=state.analyticsSelected.filter(function(id){return rows.some(function(r){return r.id===id})}).slice(0,5);state.analyticsSelected=selected;
   function value(r){if(metric==="speed")return {a:r.download_mbps,b:r.upload_mbps,unit:"Мбит/с",second:"Upload"};if(metric==="latency")return {a:r.latency_ms,b:r.jitter_ms,unit:"ms",second:"Jitter"};if(metric==="loss")return {a:r.packet_loss_percent,b:null,unit:"%",second:""};if(metric==="availability")return {a:r.availability,b:null,unit:"%",second:""};return {a:r.samples,b:null,unit:"проверок",second:""}}
@@ -206,7 +206,7 @@ async function analytics(){
 }
 
 function setMode(mode){state.mode=mode;render()}
-function toggleProvider(providerId,on){var p=state.providers.find(function(x){return x.id===providerId});if(!p)return;state.servers.filter(function(s){return s.provider_id===p.id||s.provider===p.name}).forEach(function(s){toggle(s.id,on)});render()}
+function toggleProvider(providerId,on){var p=state.providers.find(function(x){return x.id===providerId});if(!p)return;state.servers.filter(function(s){return s.provider_id===p.id||s.provider===p.name}).forEach(function(s){if(on)state.selected[s.id]=true;else delete state.selected[s.id]});render()}
 function clearSelection(){state.selected={};render()}
 
 function tests(){
