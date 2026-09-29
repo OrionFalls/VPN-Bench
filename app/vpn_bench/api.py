@@ -90,6 +90,11 @@ class FilterRequest(BaseModel):
     expressions: list[str] = Field(default_factory=list)
 
 
+class ScreeningTestStartRequest(BaseModel):
+    duration_seconds: int = Field(gt=0)
+    scheduling_mode: str = Field(pattern="^(equal_time|sequential)$")
+
+
 class ScreeningStartRequest(BaseModel):
     server_ids: list[str] = Field(min_length=1)
     first_pass_seconds: int = Field(default=30, gt=0, le=300)
@@ -612,7 +617,7 @@ def build_app(config: Config) -> FastAPI:
     @app.post("/api/v1/screening/{run_id}/start-test")
     def start_test_from_screening(
         run_id: str,
-        payload: TestStartRequest,
+        payload: ScreeningTestStartRequest,
         _: str = Depends(require_auth),
     ) -> dict:
         state = screening.get(run_id)
