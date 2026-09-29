@@ -19,7 +19,7 @@ HTML = f"""<!doctype html>
 <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <link rel="mask-icon" href="/static/Favicon.svg" color="#3D84FF">
 <title>VPN-Bench</title>
-<link rel="stylesheet" href="/static/app_v2.css">
+<link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <div class="shell">
@@ -38,7 +38,7 @@ HTML = f"""<!doctype html>
   </aside>
   <main class="main"><div id="app"></div></main>
 </div>
-<script src="/static/app_v2.js" defer></script>
+<script src="/static/app.js" defer></script>
 </body>
 </html>"""
 
