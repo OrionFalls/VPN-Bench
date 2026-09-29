@@ -1,4 +1,4 @@
-var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null,analyticsMetric:"speed",analyticsPeriod:"24h",analyticsSelected:[]};
+var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null,analyticsMetric:"speed",analyticsPeriod:"24h",analyticsSelected:[],screeningEnabled:false};
 var app=document.getElementById("app");
 
 function esc(v){return String(v==null?"":v).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]})}
@@ -181,7 +181,7 @@ async function openServer(id){state.serverDetail=await api("/api/v1/servers/"+id
 function metric(label,value,unit,kind,tip){return '<div class="metric" title="'+esc(tip||label)+'"><span class="metric-icon '+(kind||"blue")+'">'+icon("analytics")+'</span><div><small>'+esc(label)+'</small><b>'+value+(unit?" <em>"+unit+"</em>":"")+'</b></div></div>'}
 function resultStatus(v){return v===true?'<span class="ok">Доступен</span>':v===false?'<span class="err">Недоступен</span>':'—'}
 function serverDetail(){
-  var s=state.serverDetail;if(!s)return;var rs=s.results||[],latest=rs[0]||{},name=esc(s.name);
+  var s=state.serverDetail;if(!s)return;var rs=s.results||[],latest=rs[0]||{},name=esc(displayServerName(s.name));
   var speedData=rs.slice().reverse().map(function(r){return {download_mbps:r.download_mbps,upload_mbps:r.upload_mbps}});
   var lossData=rs.slice().reverse().map(function(r){return {download_mbps:r.latency_ms,upload_mbps:r.packet_loss_percent}});
   var tips={latency:"Среднее время отклика сервера.",download:"Скорость загрузки.",upload:"Скорость отдачи.",loss:"Доля потерянных пакетов.",jitter:"Разброс задержки между измерениями.",dns:"Результат DNS-проверки.",http:"Результат HTTP-проверки."};
