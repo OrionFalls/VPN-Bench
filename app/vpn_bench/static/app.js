@@ -280,6 +280,6 @@ function settings(){
   '<div class="card form-card"><h3>Безопасность</h3><p class="muted">Смена пароля администратора. После смены активная сессия будет перевыпущена.</p><button class="btn secondary" onclick="changePassword()">Изменить пароль</button></div>'+
   '<div class="card form-card"><h3>Система</h3><div class="setting-row"><span><b>VPN-Bench</b><small>Текущая версия и обновления</small></span><span class="badge">v0.2.0 · проверка обновлений</span></div><div class="form-actions"><button class="btn secondary">Что нового</button><button class="btn">Проверить обновления</button></div></div>'
 }
-function changePassword(){var a=prompt("Текущий пароль"),b=prompt("Новый пароль (минимум 12 символов)");if(!a||!b)return;try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});alert("Пароль изменён")}catch(e){alert(e.message)}}
+async function changePassword(){var a=prompt("Текущий пароль"),b=prompt("Новый пароль (минимум 12 символов)");if(!a||!b)return;try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});alert("Пароль изменён")}catch(e){alert(e.message)}}
 function startApp(){nav();boot()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startApp,{once:true});else startApp();
