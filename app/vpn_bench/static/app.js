@@ -29,7 +29,9 @@ function icon(name){
   return '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">'+(paths[name]||paths.info)+'</svg>';
 }
 function badge(text,type){return '<span class="badge '+(type||"")+'"><i></i>'+esc(text)+'</span>'}
-function flag(name){var n=String(name||"").toLowerCase();var map={"germany":"🇩🇪","de":"🇩🇪","france":"🇫🇷","fr":"🇫🇷","finland":"🇫🇮","fi":"🇫🇮","netherlands":"🇳🇱","nl":"🇳🇱","poland":"🇵🇱","pl":"🇵🇱","estonia":"🇪🇪","ee":"🇪🇪","united kingdom":"🇬🇧","uk":"🇬🇧","united states":"🇺🇸","us":"🇺🇸","japan":"🇯🇵","singapore":"🇸🇬","russia":"🇷🇺","ru":"🇷🇺"};for(var k in map)if(n===k||n.indexOf(k)>=0)return map[k];return "🌐"}
+function countryInfo(value){var s=String(value||"");var emoji=s.match(/^\s*([\u{1F1E6}-\u{1F1FF}]{2})/u);if(emoji){var f=emoji[1],a=[...f].map(function(ch){return ch.codePointAt(0)-127397});return {flag:f,code:String.fromCharCode(a[0])+String.fromCharCode(a[1])}}var n=s.toLowerCase();var map={"germany":"DE","de":"DE","france":"FR","fr":"FR","finland":"FI","fi":"FI","netherlands":"NL","nl":"NL","poland":"PL","pl":"PL","estonia":"EE","ee":"EE","united kingdom":"GB","uk":"GB","united states":"US","us":"US","japan":"JP","singapore":"SG","russia":"RU","ru":"RU"};for(var k in map)if(n===k||n.indexOf(k)>=0)return {flag:map[k].replace(/./g,function(x){return String.fromCodePoint(x.charCodeAt(0)+127397)}),code:map[k]};return {flag:"",code:""}}
+function flag(name){return countryInfo(name).flag}
+function displayServerName(name){return String(name||"").replace(/^\s*[\u{1F1E6}-\u{1F1FF}]{2}\s*/u,"").replace(/^\s*🌐\s*/,"")||String(name||"—")}
 function providerName(id){var p=state.providers.find(function(x){return x.id===id});return p?(p.display_name||p.name):"—"}
 function statusDot(ok){return '<span class="status-dot '+(ok===false?"bad":ok===true?"good":"neutral")+'"></span>'}
 function head(t,s,action){return '<div class="page-head"><div><h1>'+t+'</h1><p>'+s+'</p></div>'+(action||"")+'</div>'}
@@ -144,7 +146,7 @@ async function saveProvider(id){
 function editProvider(id){providerForm(id)}
 async function syncProvider(id){try{var r=await api("/api/v1/providers/"+id+"/sync",{method:"POST"});await refresh();render();alert("Импортировано серверов: "+r.servers)}catch(e){alert(e.message)}}
 
-function countryOf(s){var m=s.metadata||{};return m.country||m.country_name||m.country_code||m.region||""}
+function countryOf(s){var m=s.metadata||{};return m.country_code||m.country||m.country_name||countryInfo(s.name).code||""}
 function matchesRegexFilters(s){
   var expressions=state.filters.map(function(x){return String(x||"").trim()}).filter(Boolean);if(!expressions.length)return true;
   var hay=[s.name,s.provider,s.protocol,s.transport,s.security,countryOf(s)].join(" ");
@@ -177,7 +179,7 @@ function filterHtml(){
 }
 function addFilter(){state.filters.push("");render()}
 function removeFilter(i){if(state.filters.length===1){state.filters[0]="";render();return}state.filters.splice(i,1);render()}
-function toggle(id,on){if(on)state.selected[id]=true;else delete state.selected[id]}
+function toggle(id,on){if(on)state.selected[id]=true;else delete state.selected[id];render()}
 function selectAllFiltered(on){filteredServers().forEach(function(s){if(on)state.selected[s.id]=true;else delete state.selected[s.id]});render()}
 async function openServer(id){state.serverDetail=await api("/api/v1/servers/"+id);serverDetail()}
 function metric(label,value,unit,kind,tip){return '<div class="metric" title="'+esc(tip||label)+'"><span class="metric-icon '+(kind||"blue")+'">'+icon("analytics")+'</span><div><small>'+esc(label)+'</small><b>'+value+(unit?" <em>"+unit+"</em>":"")+'</b></div></div>'}
