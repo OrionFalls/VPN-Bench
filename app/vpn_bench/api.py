@@ -177,10 +177,16 @@ def build_app(config: Config) -> FastAPI:
     def providers(_: str = Depends(require_auth)) -> list[dict]:
         with db() as connection:
             rows = connection.execute(
-                "SELECT id, name, display_name, enabled, metadata_json, last_updated_at, created_at "
+                "SELECT id, name, display_name, subscription_url_encrypted, enabled, metadata_json, last_updated_at, created_at "
                 "FROM providers ORDER BY COALESCE(display_name, name)"
             ).fetchall()
-        return [dict(row) | {"metadata": json_loads(row["metadata_json"])} for row in rows]
+        result = []
+        for row in rows:
+            item = dict(row) | {"metadata": json_loads(row["metadata_json"])}
+            item["subscription_url"] = decrypt_subscription_url(row["subscription_url_encrypted"])
+            item.pop("subscription_url_encrypted", None)
+            result.append(item)
+        return result
 
     @app.post("/api/v1/providers")
     def add_provider(payload: ProviderRequest, _: str = Depends(require_auth)) -> dict:
