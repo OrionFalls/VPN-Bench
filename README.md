@@ -1,5 +1,3 @@
-# ⚡ VPN-Bench
-
 <div align="center">
 
 <img src="assets/LOGO dark.svg" alt="VPN-Bench" width="500">
