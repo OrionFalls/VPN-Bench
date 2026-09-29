@@ -453,6 +453,8 @@ def build_app(config: Config) -> FastAPI:
             raise HTTPException(status_code=409, detail="A test campaign is already running")
 
         run_id = uuid4().hex
+        with db() as connection:
+            runtime_settings = load_settings(connection)
         names = {row["id"]: row["name"] for row in rows}
         server_data = {
             row["id"]: {
@@ -494,6 +496,9 @@ def build_app(config: Config) -> FastAPI:
             def on_result(result: dict) -> None:
                 with db() as connection:
                     import json
+                    current_settings = load_settings(connection)
+                    if not current_settings["save_history"]:
+                        return
                     connection.execute(
                         "INSERT INTO test_results(run_id,server_id,started_at,duration_seconds,success,latency_ms,jitter_ms,"
                         "packet_loss_percent,download_mbps,upload_mbps,dns_ok,http_ok,whitelist_ok,details_json) "
@@ -537,6 +542,7 @@ def build_app(config: Config) -> FastAPI:
             payload.scheduling_mode,
             names,
             on_server=on_server,
+            max_parallel=runtime_settings["parallel_tests"],
         )
         return state.as_dict()
 
