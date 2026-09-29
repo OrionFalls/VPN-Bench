@@ -672,7 +672,12 @@ def build_app(config: Config) -> FastAPI:
         ]
 
     @app.get("/api/v1/analytics")
-    def analytics(_: str = Depends(require_auth)) -> dict:
+    def analytics(period: str = "24h", _: str = Depends(require_auth)) -> list[dict]:
+        periods = {"24h": "-24 hours", "7d": "-7 days", "30d": "-30 days"}
+        if period not in periods:
+            raise HTTPException(status_code=400, detail="Unsupported analytics period")
+
+        cutoff = periods[period]
         with db() as connection:
             rows = connection.execute(
                 "SELECT s.id, s.provider, s.name, s.protocol, s.transport, "
@@ -683,8 +688,10 @@ def build_app(config: Config) -> FastAPI:
                 "AVG(r.packet_loss_percent) AS packet_loss_percent, "
                 "AVG(r.download_mbps) AS download_mbps, "
                 "AVG(r.upload_mbps) AS upload_mbps "
-                "FROM servers s LEFT JOIN test_results r ON r.server_id = s.id "
-                "GROUP BY s.id ORDER BY availability DESC, latency_ms ASC, s.provider, s.name"
+                "FROM servers s LEFT JOIN test_results r "
+                "ON r.server_id = s.id AND r.started_at >= datetime('now', ?) "
+                "GROUP BY s.id ORDER BY availability DESC, latency_ms ASC, s.provider, s.name",
+                (cutoff,),
             ).fetchall()
         return [dict(row) for row in rows]
 
