@@ -12,7 +12,7 @@ async function login(){try{await api("/api/v1/auth/login",{method:"POST",body:JS
 async function refresh(){state.providers=await api("/api/v1/providers");state.servers=await api("/api/v1/servers")}
 function nav(){var n=document.querySelector(".nav");if(n&&!n.dataset.bound){n.addEventListener("click",function(e){var b=e.target.closest("button[data-page]");if(!b)return;state.page=b.dataset.page;state.serverDetail=null;render()});n.dataset.bound="1"}document.querySelectorAll(".nav button").forEach(function(b){b.classList.toggle("active",b.dataset.page===state.page)})}
 function head(t,s,action){return '<div class="top"><div><h1>'+t+'</h1><div class="muted">'+s+'</div></div>'+(action||"")+'</div>'}
-function badge(text,type){return '<span class="badge '+(type||"")+"">"+esc(text)+"</span>'}
+function badge(text,type){return '<span class="badge '+(type||"")+'">'+esc(text)+"</span>"}
 function flag(name){var n=String(name||"").toLowerCase();var map={"germany":"🇩🇪","france":"🇫🇷","finland":"🇫🇮","netherlands":"🇳🇱","poland":"🇵🇱","united kingdom":"🇬🇧","united states":"🇺🇸","japan":"🇯🇵","singapore":"🇸🇬"};for(var k in map)if(n.indexOf(k)>=0)return map[k];return "🌐"}
 function providerName(id){var p=state.providers.find(function(x){return x.id===id});return p?(p.display_name||p.name):"—"}
 function statusDot(ok){return '<span class="dot '+(ok===false?"bad":ok===true?"good":"muted-dot")+'"></span>'}
