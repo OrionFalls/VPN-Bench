@@ -4,6 +4,11 @@ import hashlib
 import secrets
 import os
 import sqlite3
+import re
+import signal
+import threading
+import urllib.request
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid4, uuid5
@@ -103,6 +108,10 @@ def build_app(config: Config) -> FastAPI:
 
     def db() -> sqlite3.Connection:
         return connect(config.app.database)
+
+    def write_log(level: str, message: str, context: dict | None = None) -> None:
+        with db() as connection:
+            connection.execute("INSERT INTO logs(created_at, level, message, context_json) VALUES(?,?,?,?)", (utc_now(), level.upper(), message, json.dumps(context or {}, ensure_ascii=False)))
 
     def require_auth(vpn_bench_session: str | None = Cookie(default=None)) -> str:
         if not vpn_bench_session:
