@@ -40,24 +40,45 @@ async function dashboard(){
   if(t.status==="running")setTimeout(dashboard,1000);
 }
 function summary(t){if(!t||t.status==="idle")return '<div class="empty-state"><div class="empty-icon">✓</div><b>Тестирование не запущено</b><span>Запустите тест в разделе «Тесты».</span></div>';return '<div class="test-progress-head"><b>'+esc(t.current_server_name||"Завершение")+'</b><span>'+t.completed_servers+" / "+t.total_servers+'</span></div><div class="progress"><div class="bar" style="width:'+t.progress+'%"></div></div><div class="test-meta"><span>Прогресс <b>'+t.progress+'%</b></span><span>Прошло <b>'+fmt(t.elapsed_seconds)+'</b></span><span>Осталось <b>'+(t.remaining_seconds==null?"рассчитывается":fmt(t.remaining_seconds))+'</b></span></div><div class="muted">'+esc(t.message)+'</div>'}
-function providerRows(){return state.providers.map(function(p){var n=state.servers.filter(function(s){return s.provider_id===p.id}).length;var meta=p.metadata||{};var status=p.enabled?badge("Активен","good"):badge("Выключен","bad");return '<tr><td>'+status+'</td><td><b>'+esc(p.display_name||p.name||"—")+'</b><br><span class="muted">'+esc(p.name||"Автоопределение")+'</span></td><td><a class="link" href="#" onclick="event.preventDefault();syncProvider(\''+p.id+'\')">подписка</a></td><td>'+n+'</td><td>'+status+'</td><td>'+esc(p.last_updated_at||"—")+'</td><td><button class="icon-btn" onclick="editProvider(\''+p.id+'\')" title="Редактировать">✎</button><button class="icon-btn" onclick="syncProvider(\''+p.id+'\')" title="Обновить">↻</button></td></tr>'}).join("")}
+function metadataSummary(p){
+  var m=p.metadata||{},parts=[];
+  if(m.expire)parts.push("до "+new Date(Number(m.expire)*1000).toLocaleDateString("ru-RU"));
+  if(m.download!=null||m.upload!=null||m.total!=null){
+    var used=(Number(m.download||0)+Number(m.upload||0));
+    var total=Number(m.total||0);
+    if(total)parts.push((used/1073741824).toFixed(0)+" GB / "+(total/1073741824).toFixed(0)+" GB");
+  }
+  if(m["profile-update-interval"])parts.push("обновление "+m["profile-update-interval"]);
+  return parts.join(" · ");
+}
+function providerRows(){
+  return state.providers.map(function(p){
+    var n=state.servers.filter(function(s){return s.provider_id===p.id}).length;
+    var status=p.enabled?badge("Активен","good"):badge("Выключен","bad");
+    var meta=metadataSummary(p);
+    return '<tr><td>'+status+'</td><td><b>'+esc(p.display_name||p.name||"—")+'</b><br><span class="muted">'+esc(p.name||"Автоопределение")+'</span>'+(meta?'<br><small class="table-sub">'+esc(meta)+'</small>':"")+'</td><td><span class="masked-url">'+esc(p.subscription_url_masked||"••••")+'</span></td><td>'+n+'</td><td>'+status+'</td><td>'+esc(p.last_updated_at||"—")+'</td><td><button class="icon-btn" onclick="editProvider(&quot;'+p.id+'&quot;)" title="Редактировать">✎</button><button class="icon-btn" onclick="syncProvider(&quot;'+p.id+'&quot;)" title="Обновить">↻</button></td></tr>';
+  }).join("");
+}
 function providers(){app.innerHTML=head("Провайдеры","Управление подписками и настройками провайдеров",'<button class="btn" onclick="providerForm()">Добавить провайдера</button>')+'<div class="card table-card"><div class="table-scroll"><table class="table provider-table"><thead><tr><th></th><th>Название</th><th>URL подписки</th><th>Серверов</th><th>Статус</th><th>Обновлено</th><th>Действия</th></tr></thead><tbody>'+(providerRows()||'<tr><td colspan="7" class="empty">Провайдеров пока нет</td></tr>')+'</tbody></table></div></div>'}
 function providerForm(id){
   var p=id?state.providers.find(function(x){return x.id===id}):null;
   var name=p?esc(p.display_name||""):"";
-  var url=p?esc(p.subscription_url||""):"";
   var title=p?"Редактировать провайдера":"Добавить провайдера";
   app.innerHTML=head(title,"Подключение подписки и параметры обновления")+
     '<div class="card form-card"><div class="form-grid">'+
     '<label>Название<span class="optional">необязательно</span><input id="pn" class="input" value="'+name+'" placeholder="Оставьте пустым — определится автоматически"></label>'+
     '<div class="field-help">Если оставить поле пустым, VPN-Bench попробует определить название из метаданных подписки. Позже его можно изменить вручную.</div>'+
-    '<label>URL подписки<span>*</span><input id="pu" class="input" value="'+url+'" placeholder="https://example.com/sub"></label>'+
+    '<label>URL подписки<span>*</span><input id="pu" class="input" type="password" value="" placeholder="'+(p?(p.subscription_url_masked||"••••"):"https://example.com/sub")+'"><button class="btn secondary reveal-url" onclick="revealProviderUrl(&quot;'+(p?p.id:"")+'&quot;)">'+(p?"Показать текущий URL":"")+'</button></label>'+
     '<label>Тип подписки<select id="pt" class="input"><option>Автоопределение</option></select></label>'+
     '<label>Описание<input id="pd" class="input" placeholder="Необязательно"></label></div>'+
     '<div class="checks"><label><input id="pa" type="checkbox" checked> Автоматическое обновление</label>'+
     '<label><input id="pv" type="checkbox" checked> Проверять доступность при обновлении</label></div>'+
     '<div class="form-actions"><button class="btn secondary" onclick="state.page=&quot;providers&quot;;render()">Отмена</button>'+
     '<button class="btn" onclick="saveProvider(&quot;'+(p?p.id:"")+'&quot;)">Сохранить</button></div></div>';
+}
+async function revealProviderUrl(id){
+  if(!id)return;
+  try{var r=await api("/api/v1/providers/"+id+"/subscription-url");var el=document.getElementById("pu");if(el){el.type="text";el.value=r.subscription_url;}}catch(e){alert(e.message)}
 }
 async function saveProvider(id){var name=document.getElementById("pn").value.trim(),url=document.getElementById("pu").value.trim();if(!url)return alert("Укажите URL подписки");try{var body={name:name,display_name:name||null,subscription_url:url,enabled:true};var p=await api(id?"/api/v1/providers/"+id:"/api/v1/providers",{method:id?"PUT":"POST",body:JSON.stringify(body)});await api("/api/v1/providers/"+p.id+"/sync",{method:"POST"});await refresh();state.page="providers";render()}catch(e){alert(e.message)}}
 function editProvider(id){providerForm(id)}
