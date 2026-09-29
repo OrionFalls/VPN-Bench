@@ -644,14 +644,49 @@ def build_app(config: Config) -> FastAPI:
         latest = manager.latest()
         with db() as connection:
             provider_count = connection.execute("SELECT COUNT(*) FROM providers WHERE enabled = 1").fetchone()[0]
-            server_count = connection.execute("SELECT COUNT(*) FROM servers").fetchone()[0]
+            server_count = connection.execute("SELECT COUNT(*) FROM servers WHERE active = 1").fetchone()[0]
             result_count = connection.execute("SELECT COUNT(*) FROM test_results").fetchone()[0]
+            tested_now = 1 if latest and latest.status in {"running", "stopping"} else 0
+            top_rows = connection.execute(
+                "SELECT s.id, s.provider, s.name, s.protocol, s.transport, AVG(r.latency_ms) latency_ms, "
+                "AVG(r.download_mbps) download_mbps, AVG(r.packet_loss_percent) packet_loss_percent, "
+                "AVG(CASE WHEN r.success=1 THEN 100.0 ELSE 0.0 END) availability "
+                "FROM servers s JOIN test_results r ON r.server_id=s.id "
+                "GROUP BY s.id ORDER BY availability DESC, latency_ms ASC LIMIT 5"
+            ).fetchall()
+            dist = connection.execute(
+                "SELECT SUM(CASE WHEN x.availability >= 95 THEN 1 ELSE 0 END) optimal, "
+                "SUM(CASE WHEN x.availability >= 80 AND x.availability < 95 THEN 1 ELSE 0 END) warning, "
+                "SUM(CASE WHEN x.availability < 80 THEN 1 ELSE 0 END) failed "
+                "FROM (SELECT server_id, AVG(CASE WHEN success=1 THEN 100.0 ELSE 0.0 END) availability FROM test_results GROUP BY server_id) x"
+            ).fetchone()
+            trend = connection.execute(
+                "SELECT substr(started_at,1,13) hour, AVG(download_mbps) download_mbps, AVG(upload_mbps) upload_mbps "
+                "FROM test_results WHERE started_at >= datetime('now','-24 hours') AND (download_mbps IS NOT NULL OR upload_mbps IS NOT NULL) "
+                "GROUP BY hour ORDER BY hour"
+            ).fetchall()
         return {
             "providers": provider_count,
             "servers": server_count,
             "results": result_count,
+            "testing_now": tested_now,
+            "optimal": int(dist["optimal"] or 0),
+            "warning": int(dist["warning"] or 0),
+            "failed": int(dist["failed"] or 0),
+            "top_servers": [dict(r) for r in top_rows],
+            "speed_trend": [dict(r) for r in trend],
             "test": latest.as_dict() if latest else {"status": "idle"},
         }
+
+    @app.get("/api/v1/logs")
+    def logs(level: str = "all", limit: int = 100, _: str = Depends(require_auth)) -> list[dict]:
+        limit = max(1, min(500, limit))
+        with db() as connection:
+            if level == "all":
+                rows = connection.execute("SELECT id, created_at, level, message, context_json FROM logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+            else:
+                rows = connection.execute("SELECT id, created_at, level, message, context_json FROM logs WHERE level = ? ORDER BY id DESC LIMIT ?", (level.upper(), limit)).fetchall()
+        return [dict(r) | {"context": json_loads(r["context_json"])} for r in rows]
 
     return app
 
