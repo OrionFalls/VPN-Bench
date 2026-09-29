@@ -7,7 +7,7 @@ HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f7fb">
 <title>VPN-Bench</title>
-<link rel="stylesheet" href="/static/app.css?v=7">
+<link rel="stylesheet" href="/static/app.css?v=8">
 </head>
 <body>
 <div class="shell">
@@ -28,7 +28,7 @@ HTML = """<!doctype html>
     <div id="app"></div>
   </main>
 </div>
-<script src="/static/app.js?v=7" defer></script>
+<script src="/static/app.js?v=8" defer></script>
 </body>
 </html>"""
 
