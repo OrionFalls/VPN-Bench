@@ -7,7 +7,7 @@ HTML = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f5f7fb">
 <title>VPN-Bench</title>
-<link rel="stylesheet" href="/static/app.css?v=6">
+<link rel="stylesheet" href="/static/app.css?v=7">
 </head>
 <body>
 <div class="shell">
@@ -18,7 +18,7 @@ HTML = """<!doctype html>
       <button data-page="providers"><span class="nav-icon">◉</span><span>Провайдеры</span></button>
       <button data-page="servers"><span class="nav-icon">◌</span><span>Серверы</span></button>
       <button data-page="tests"><span class="nav-icon">▶</span><span>Тесты</span></button>
-      <button data-page="analytics"><span class="nav-icon">▥</span><span>Графики</span></button>\n      <button data-page="comparison"><span class="nav-icon">◫</span><span>Сравнение</span></button>
+      <button data-page="analytics"><span class="nav-icon">▥</span><span>Графики / Сравнение</span></button>
       <button data-page="logs"><span class="nav-icon">≡</span><span>Логи</span></button>
       <button data-page="settings"><span class="nav-icon">⚙</span><span>Настройки</span></button>
     </nav>
@@ -28,7 +28,7 @@ HTML = """<!doctype html>
     <div id="app"></div>
   </main>
 </div>
-<script src="/static/app.js?v=6" defer></script>
+<script src="/static/app.js?v=7" defer></script>
 </body>
 </html>"""
 
