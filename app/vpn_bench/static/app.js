@@ -88,7 +88,7 @@ function donut(opt,warn,fail){
 }
 async function dashboard(){
   var d=await api("/api/v1/dashboard"),t=d.test||{},top=d.top_servers||[];
-  var rows=top.map(function(r,i){return '<tr><td>'+String(i+1).padStart(2,"0")+'</td><td>'+esc(r.provider)+'</td><td><span class="server-name">'+flag(r.name)+' '+esc(r.name)+'</span></td><td>'+num(r.latency_ms,0)+' ms</td><td><b>'+num(r.download_mbps,0)+'</b> Мбит/с</td><td>'+num(r.availability,1)+'%</td></tr>'}).join("");
+  var rows=top.map(function(r,i){return '<tr><td>'+String(i+1).padStart(2,"0")+'</td><td>'+esc(r.provider)+'</td><td><span class="server-name">'+(flag(r.name)?flag(r.name)+" ":"")+esc(displayServerName(r.name))+'</span></td><td>'+num(r.latency_ms,0)+' ms</td><td><b>'+num(r.download_mbps,0)+'</b> Мбит/с</td><td>'+num(r.availability,1)+'%</td></tr>'}).join("");
   var html=head("Дашборд","Краткая статистика по всем провайдерам и серверам",'<span class="updated"><span class="pulse"></span>Обновлено: сейчас</span>');
   html+='<div class="stats">';
   html+='<div class="kpi"><span class="kpi-icon blue">'+icon("providers")+'</span><div><b>'+d.providers+'</b><span>Провайдеров</span><small>Подключено</small></div></div>';
