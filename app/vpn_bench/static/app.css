@@ -37,3 +37,5 @@
 @media (max-width:760px){.side{position:relative;left:auto;top:auto;bottom:auto;width:100%;height:auto;border-radius:0}.shell{display:block}.nav{flex-direction:row;overflow:auto}.nav button{flex:none}.main{margin-left:0;padding:24px 16px}.stats{grid-template-columns:1fr}.test-grid{grid-template-columns:1fr}.filter-toolbar{grid-template-columns:1fr 1fr}.password-grid{grid-template-columns:1fr}}
 
 .settings-layout{display:block}.settings-nav{display:none}.settings-content{width:100%;max-width:1000px}
+
+.protocol-main{display:block}.protocol-sub{display:block;margin-top:2px;color:#718096;font-size:8px;font-weight:600}.security-sub{display:block;margin-top:1px;color:#a0aaba;font-size:8px;font-weight:500}.server-table td[data-col="protocol"]{vertical-align:middle}
