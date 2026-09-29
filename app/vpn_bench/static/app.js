@@ -47,9 +47,9 @@ async function boot(){
   }catch(e){app.innerHTML='<div class="auth-wrap"><div class="auth-card card"><img src="/static/LOGO.svg" class="auth-logo"><h1>Ошибка запуска</h1><p>'+esc(e.message||e)+'</p><button class="btn" onclick="location.reload()">Повторить</button></div></div>'}
 }
 function setupPage(){app.innerHTML='<div class="auth-wrap"><div class="auth-card card"><img src="/static/LOGO.svg" class="auth-logo"><div class="auth-icon">'+icon("lock")+'</div><h1>Добро пожаловать</h1><p>Создайте пароль администратора VPN-Bench. Минимум 12 символов.</p><input id="p1" class="input" type="password" placeholder="Пароль"><input id="p2" class="input" type="password" placeholder="Повторите пароль"><button class="btn wide" onclick="setup()">Создать администратора</button></div></div>'}
-async function setup(){var a=document.getElementById("p1").value,b=document.getElementById("p2").value;if(a!==b)return alert("Пароли не совпадают");try{await api("/api/v1/setup",{method:"POST",body:JSON.stringify({password:a})});await refresh();render()}catch(e){showToast(e.message,"error")}}
+async function setup(){var a=document.getElementById("p1").value,b=document.getElementById("p2").value;if(a!==b)return showToast("Пароли не совпадают","error");try{await api("/api/v1/setup",{method:"POST",body:JSON.stringify({password:a})});await refresh();render()}catch(e){showToast(e.message,"error")}}
 function loginPage(){app.innerHTML='<div class="auth-wrap"><div class="auth-card card"><img src="/static/LOGO.svg" class="auth-logo"><div class="auth-icon">'+icon("lock")+'</div><h1>Вход в VPN-Bench</h1><p>Введите пароль администратора.</p><input id="lp" class="input" type="password" placeholder="Пароль" onkeydown="if(event.key===\'Enter\')login()"><button class="btn wide" onclick="login()">Войти</button></div></div>'}
-async function login(){try{await api("/api/v1/auth/login",{method:"POST",body:JSON.stringify({password:document.getElementById("lp").value})});await refresh();render()}catch(e){alert("Неверный пароль")}}
+async function login(){try{await api("/api/v1/auth/login",{method:"POST",body:JSON.stringify({password:document.getElementById("lp").value})});await refresh();render()}catch(e){showToast("Неверный пароль","error")}}
 async function refresh(){state.providers=await api("/api/v1/providers");state.servers=await api("/api/v1/servers")}
 
 function nav(){
@@ -69,7 +69,7 @@ async function render(){
     else if(state.page==="tests")tests();
     else if(state.page==="analytics")await analytics();
     else if(state.page==="logs")await logs();
-    else settings();
+    else await settings();
   }catch(e){app.innerHTML=head("Ошибка","Не удалось загрузить раздел")+'<section class="card error-card"><div class="empty-icon">'+icon("warning")+'</div><h3>Не удалось загрузить раздел</h3><p>'+esc(e.message||e)+'</p><button class="btn" onclick="render()">Повторить</button></section>'}
 }
 
@@ -240,21 +240,51 @@ async function stopScreening(id){try{await api("/api/v1/screening/"+id+"/stop",{
 async function startFullFromScreening(id){try{await api("/api/v1/screening/"+id+"/start-test",{method:"POST",body:JSON.stringify({duration_seconds:state.duration,scheduling_mode:state.mode})});showToast("Полный тест shortlist запущен","success");loadStatus()}catch(e){showToast(e.message,"error")}}
 
 async function logs(level){level=level||"all";try{var rows=await api("/api/v1/logs?level="+encodeURIComponent(level)+"&limit=100")||[];var body=rows.map(function(r){return '<div class="log-row"><time>'+esc(r.created_at)+'</time><b class="log-'+String(r.level).toLowerCase()+'">'+esc(r.level)+'</b><span>'+esc(r.message)+'</span></div>'}).join("");app.innerHTML=head("Логи","Системные события, тесты и ошибки",'<div class="head-actions"><select class="input small" onchange="logs(this.value)"><option value="all" '+(level==="all"?"selected":"")+' >Все уровни</option><option value="INFO" '+(level==="INFO"?"selected":"")+'>INFO</option><option value="WARN" '+(level==="WARN"?"selected":"")+'>WARN</option><option value="ERROR" '+(level==="ERROR"?"selected":"")+'>ERROR</option></select></div>')+'<section class="card log-card"><div class="log-toolbar"><span>'+rows.length+' событий</span><span class="muted">Последние 100 записей</span></div>'+(body||'<div class="empty">Системных событий пока нет</div>')+'</section>'}catch(e){app.innerHTML=head("Логи","Системные события, тесты и ошибки")+'<section class="card"><p>'+esc(e.message)+'</p></section>'}}
-function settings(){
+async function settings(){
+  var s;
+  try{s=await api("/api/v1/settings")}catch(e){app.innerHTML=head("Настройки","Основные параметры VPN-Bench")+'<section class="card error-card"><h3>Не удалось загрузить настройки</h3><p>'+esc(e.message)+'</p><button class="btn" onclick="render()">Повторить</button></section>';return}
   app.innerHTML=head("Настройки","Основные параметры VPN-Bench")+
-  '<div class="settings-layout"><aside class="settings-nav"><button class="active">Основные</button><button>Безопасность</button><button>Система</button></aside><div class="settings-content">'+
+  '<div class="settings-onepage">'+
   '<section class="card form-card"><div class="card-head"><div><h3>Основные</h3><p>Параметры фоновой работы и хранения результатов</p></div></div>'+
-  '<div class="setting-row"><span><b>Параллельные тесты</b><small>Количество одновременно запускаемых проверок</small></span><input class="input short" value="1"></div>'+
-  '<div class="setting-row"><span><b>Автообновление подписок</b><small>Автоматически обновлять данные провайдеров</small></span><input type="checkbox" checked></div>'+
-  '<div class="setting-row"><span><b>Сохранять историю</b><small>Хранить результаты измерений</small></span><input type="checkbox" checked></div>'+
-  '<div class="setting-row"><span><b>Срок хранения</b><small>Удаление старых измерений</small></span><select class="input short"><option>30 дней</option><option>90 дней</option><option>180 дней</option><option>365 дней</option></select></div>'+
-  '<div class="setting-row"><span><b>Использовать IPv6</b><small>Разрешить IPv6 для проверок</small></span><input type="checkbox"></div>'+
-  '<div class="form-actions"><button class="btn">Сохранить настройки</button></div></section>'+
-  '<section class="card form-card"><div class="card-head"><div><h3>Безопасность</h3><p>Доступ к панели и защита учетной записи администратора</p></div></div><div class="security-row"><span class="info-badge">'+icon("lock")+'</span><div><b>Пароль администратора</b><small>Пароль хранится в виде защищённого хэша.</small></div><button class="btn secondary" onclick="changePassword()">Изменить пароль</button></div></section>'+
-  '<section class="card form-card"><div class="card-head"><div><h3>Система</h3><p>Версия, обновления и состояние сервиса</p></div></div><div class="system-version"><img src="/static/Favicon.svg"><div><b>VPN-Bench</b><small>Текущая версия 0.2.0</small></div><span class="badge neutral">Установлена</span></div><div class="form-actions"><button class="btn secondary" onclick="checkUpdates()">Проверить обновления</button><button class="btn secondary" onclick="restartService()">Перезапустить сервис</button></div></section></div></div>'
+  '<div class="setting-row"><span><b>Параллельные тесты</b><small>Количество одновременно запускаемых проверок</small></span><input id="set-parallel" class="input short" type="number" min="1" max="16" value="'+Number(s.parallel_tests||1)+'"></div>'+
+  '<div class="setting-row"><span><b>Автообновление подписок</b><small>Разрешить фоновое обновление подключенных подписок</small></span><input id="set-auto" type="checkbox" '+(s.auto_update_subscriptions?"checked":"")+'></div>'+
+  '<div class="setting-row"><span><b>Сохранять историю</b><small>Сохранять результаты измерений в базе данных</small></span><input id="set-history" type="checkbox" '+(s.save_history?"checked":"")+'></div>'+
+  '<div class="setting-row"><span><b>Срок хранения</b><small>Период хранения результатов измерений</small></span><select id="set-retention" class="input short"><option value="30" '+(Number(s.retention_days)===30?"selected":"")+'>30 дней</option><option value="90" '+(Number(s.retention_days)===90?"selected":"")+'>90 дней</option><option value="180" '+(Number(s.retention_days)===180?"selected":"")+'>180 дней</option><option value="365" '+(Number(s.retention_days)===365?"selected":"")+'>365 дней</option><option value="730" '+(Number(s.retention_days)===730?"selected":"")+'>2 года</option></select></div>'+
+  '<div class="setting-row"><span><b>Использовать IPv6</b><small>Разрешить IPv6 для проверок, если он доступен</small></span><input id="set-ipv6" type="checkbox" '+(s.ipv6?"checked":"")+'></div>'+
+  '<div class="form-actions"><button class="btn" onclick="saveSettings()">Сохранить настройки</button></div></section>'+
+  '<section class="card form-card"><div class="card-head"><div><h3>Безопасность</h3><p>Доступ к панели и защита учетной записи администратора</p></div></div>'+
+  '<div class="password-grid"><label>Текущий пароль<input id="cp-current" class="input" type="password" autocomplete="current-password"></label><label>Новый пароль<input id="cp-new" class="input" type="password" minlength="12" autocomplete="new-password"></label><label>Повтор нового пароля<input id="cp-confirm" class="input" type="password" minlength="12" autocomplete="new-password"></label></div>'+
+  '<div class="form-actions"><button class="btn secondary" onclick="changePassword()">Изменить пароль</button></div></section>'+
+  '<section class="card form-card"><div class="card-head"><div><h3>Система</h3><p>Версия, обновления и состояние сервиса</p></div></div>'+
+  '<div class="system-version"><img src="/static/Favicon.svg"><div><b>VPN-Bench</b><small>Текущая версия '+esc(s.version||"—")+'</small></div><span class="badge neutral">Установлена</span></div>'+
+  '<div id="system-result" class="system-result"></div><div class="form-actions"><button class="btn secondary" onclick="checkUpdates()">Проверить обновления</button><button class="btn secondary" onclick="restartService()">Перезапустить сервис</button></div></section></div>';
 }
-async function changePassword(){var a=prompt("Текущий пароль"),b=prompt("Новый пароль (минимум 12 символов)");if(!a||!b)return;try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});alert("Пароль изменён")}catch(e){alert(e.message)}}
-async function checkUpdates(){try{var r=await api("/api/v1/system/update-check");showToast(r.message||"Проверка завершена","success")}catch(e){showToast(e.message||"Проверка обновлений недоступна","error")}}
-async function restartService(){if(!confirm("Перезапустить VPN-Bench?"))return;try{await api("/api/v1/system/restart",{method:"POST"});showToast("Сервис перезапускается…","success")}catch(e){showToast(e.message||"Не удалось перезапустить сервис","error")}}
+async function saveSettings(){
+  var payload={
+    parallel_tests:Math.max(1,Math.min(16,Number(document.getElementById("set-parallel").value)||1)),
+    auto_update_subscriptions:document.getElementById("set-auto").checked,
+    save_history:document.getElementById("set-history").checked,
+    retention_days:Number(document.getElementById("set-retention").value)||90,
+    ipv6:document.getElementById("set-ipv6").checked
+  };
+  try{await api("/api/v1/settings",{method:"PUT",body:JSON.stringify(payload)});showToast("Настройки сохранены","success")}catch(e){showToast(e.message||"Не удалось сохранить настройки","error")}
+}
+async function changePassword(){
+  var a=document.getElementById("cp-current").value,b=document.getElementById("cp-new").value,c=document.getElementById("cp-confirm").value;
+  if(!a||!b)return showToast("Заполните текущий и новый пароль","error");
+  if(b!==c)return showToast("Новые пароли не совпадают","error");
+  if(b.length<12)return showToast("Новый пароль должен содержать минимум 12 символов","error");
+  try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});document.getElementById("cp-current").value="";document.getElementById("cp-new").value="";document.getElementById("cp-confirm").value="";showToast("Пароль изменён","success")}catch(e){showToast(e.message||"Не удалось изменить пароль","error")}
+}
+async function checkUpdates(){
+  var el=document.getElementById("system-result");
+  if(el)el.textContent="Проверяем обновления…";
+  try{var r=await api("/api/v1/system/update-check");if(el)el.textContent=r.message||"Проверка завершена";showToast(r.message||"Проверка завершена","success")}catch(e){if(el)el.textContent=e.message||"Проверка обновлений недоступна";showToast(e.message||"Проверка обновлений недоступна","error")}
+}
+async function restartService(){
+  if(!window.confirm("Перезапустить VPN-Bench?"))return;
+  try{await api("/api/v1/system/restart",{method:"POST"});showToast("Сервис перезапускается…","success")}catch(e){showToast(e.message||"Не удалось перезапустить сервис","error")}
+}
+
 function startApp(){nav();boot()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startApp,{once:true});else startApp();
