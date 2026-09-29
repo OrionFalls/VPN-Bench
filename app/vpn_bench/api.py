@@ -482,6 +482,7 @@ def build_app(config: Config) -> FastAPI:
                 on_result=on_result,
             )
 
+        write_log("INFO", "Запущена тестовая кампания", {"run_id": run_id, "servers": len(payload.server_ids)})
         state = manager.create(
             run_id,
             payload.server_ids,
@@ -599,6 +600,7 @@ def build_app(config: Config) -> FastAPI:
                     ),
                 )
 
+        write_log("INFO", "Запущен скрининг", {"run_id": run_id, "servers": len(server_data)})
         state = screening.start(
             run_id,
             server_data,
@@ -640,12 +642,14 @@ def build_app(config: Config) -> FastAPI:
     def stop_screening(run_id: str, _: str = Depends(require_auth)) -> dict:
         if not screening.stop(run_id):
             raise HTTPException(status_code=404, detail="Active screening run not found")
+        write_log("INFO", "Запрошена остановка скрининга", {"run_id": run_id})
         return {"ok": True}
 
     @app.post("/api/v1/tests/{run_id}/stop")
     def stop_test(run_id: str, _: str = Depends(require_auth)) -> dict:
         if not manager.stop(run_id):
             raise HTTPException(status_code=404, detail="Active test run not found")
+        write_log("INFO", "Запрошена остановка тестовой кампании", {"run_id": run_id})
         return {"ok": True}
 
     @app.get("/api/v1/tests/{run_id}/results")
@@ -717,6 +721,33 @@ def build_app(config: Config) -> FastAPI:
             "speed_trend": [dict(r) for r in trend],
             "test": latest.as_dict() if latest else {"status": "idle"},
         }
+
+    @app.get("/api/v1/system/update-check")
+    def update_check(_: str = Depends(require_auth)) -> dict:
+        current = config.app.version
+        latest = None
+        try:
+            request = urllib.request.Request(
+                "https://api.github.com/repos/OrionFalls/VPN-Bench/releases/latest",
+                headers={"Accept": "application/vnd.github+json", "User-Agent": "VPN-Bench"},
+            )
+            with urllib.request.urlopen(request, timeout=4) as response:
+                payload = json.load(response)
+            latest = str(payload.get("tag_name") or "").lstrip("v") or None
+        except Exception:
+            latest = None
+        message = f"Текущая версия: {current}"
+        if latest:
+            message += f" · последняя: {latest}"
+        else:
+            message += " · последнюю версию проверить не удалось"
+        return {"current_version": current, "latest_version": latest, "message": message}
+
+    @app.post("/api/v1/system/restart")
+    def restart_service(_: str = Depends(require_auth)) -> dict:
+        write_log("WARN", "Запрошен перезапуск сервиса")
+        threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+        return {"ok": True}
 
     @app.get("/api/v1/logs")
     def logs(level: str = "all", limit: int = 100, _: str = Depends(require_auth)) -> list[dict]:
