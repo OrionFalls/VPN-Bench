@@ -108,14 +108,7 @@ function summary(t){
   return '<div class="test-progress-head"><div><b>'+esc(t.current_server_name||"Завершение")+'</b><span>'+esc(t.message||"")+'</span></div><strong>'+t.progress+'%</strong></div><div class="progress"><div class="bar" style="width:'+t.progress+'%"></div></div><div class="test-meta"><span>Обработано <b>'+t.completed_servers+' / '+t.total_servers+'</b></span><span>Прошло <b>'+fmt(t.elapsed_seconds)+'</b></span><span>Осталось <b>'+(t.remaining_seconds==null?"рассчитывается":fmt(t.remaining_seconds))+'</b></span></div>'
 }
 
-function metadataSummary(p){
-  var m=p.metadata||{},parts=[];
-  if(m.expire)parts.push("до "+new Date(Number(m.expire)*1000).toLocaleDateString("ru-RU"));
-  if(m.download!=null||m.upload!=null||m.total!=null){var used=Number(m.download||0)+Number(m.upload||0),total=Number(m.total||0);if(total)parts.push((used/1073741824).toFixed(0)+" GB / "+(total/1073741824).toFixed(0)+" GB")}
-  if(m["profile-update-interval"])parts.push("обновление "+m["profile-update-interval"]);
-  return parts.join(" · ");
-}
-function providerRows(){
+function metadataSummary(p){var m=p.metadata||{},parts=[];if(m["profile-title"])parts.push(m["profile-title"]);if(m.server_count!=null)parts.push(m.server_count+" серверов");if(m.expire_at)parts.push("до "+new Date(m.expire_at).toLocaleDateString("ru-RU"));else if(m.expire)parts.push("до "+new Date(Number(m.expire)*1000).toLocaleDateString("ru-RU"));if(m.total!=null){var used=Number(m.used||0),total=Number(m.total||0);parts.push((used/1073741824).toFixed(1)+" / "+(total/1073741824).toFixed(1)+" GB");}if(m["profile-update-interval"])parts.push("обновление "+m["profile-update-interval"]);if(Array.isArray(m.protocols)&&m.protocols.length)parts.push(m.protocols.join(", "));if(Array.isArray(m.countries)&&m.countries.length)parts.push(m.countries.join(", "));return parts.join(" · ")}\nfunction providerRows(){
   return state.providers.map(function(p){
     var n=state.servers.filter(function(s){return s.provider_id===p.id}).length;
     var meta=metadataSummary(p);
