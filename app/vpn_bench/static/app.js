@@ -42,7 +42,8 @@ async function boot(){
     var s=await api("/api/v1/setup/status");
     if(!s.configured){setupPage();return}
     try{await api("/api/v1/auth/me")}catch(_){loginPage();return}
-    try{var h=await api("/health"),v=document.getElementById("app-version");if(v)v.textContent="v"+h.version}catch(_){}\n    try{await refresh()}catch(e){state.bootError=e.message}
+    try{var h=await api("/health"),v=document.getElementById("app-version");if(v)v.textContent="v"+h.version}catch(_){}
+    try{await refresh()}catch(e){state.bootError=e.message}
     await render()
   }catch(e){app.innerHTML='<div class="auth-wrap"><div class="auth-card card"><img src="/static/LOGO.svg" class="auth-logo"><h1>Ошибка запуска</h1><p>'+esc(e.message||e)+'</p><button class="btn" onclick="location.reload()">Повторить</button></div></div>'}
 }
