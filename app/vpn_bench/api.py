@@ -200,6 +200,18 @@ def build_app(config: Config) -> FastAPI:
             )
         return {"id": provider_id, "name": payload.name, "display_name": payload.display_name}
 
+    @app.put("/api/v1/providers/{provider_id}")
+    def update_provider(provider_id: str, payload: ProviderRequest, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            row = connection.execute("SELECT id FROM providers WHERE id = ?", (provider_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Provider not found")
+            connection.execute(
+                "UPDATE providers SET name = ?, display_name = ?, subscription_url_encrypted = ?, enabled = ? WHERE id = ?",
+                (payload.name, payload.display_name, encrypt_subscription_url(payload.subscription_url), int(payload.enabled), provider_id),
+            )
+        return {"id": provider_id, "name": payload.name, "display_name": payload.display_name, "enabled": payload.enabled}
+
     @app.post("/api/v1/providers/{provider_id}/sync")
     def sync_provider(provider_id: str, _: str = Depends(require_auth)) -> dict:
         with db() as connection:
