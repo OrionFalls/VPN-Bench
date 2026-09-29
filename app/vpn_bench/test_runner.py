@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
@@ -25,6 +26,7 @@ class TestRunState:
     current_server_elapsed: float = 0.0
     message: str = ""
     stopped_at: float | None = None
+    max_parallel: int = 1
 
     @property
     def elapsed_seconds(self) -> float:
@@ -69,6 +71,7 @@ class TestRunState:
             "current_server_name": self.current_server_name,
             "current_server_elapsed": round(self.current_server_elapsed, 1),
             "message": self.message,
+            "max_parallel": self.max_parallel,
         }
 
 
@@ -86,6 +89,7 @@ class TestRunManager:
         scheduling_mode: str,
         server_names: dict[str, str] | None = None,
         on_server: Callable[[str, float, threading.Event], bool] | None = None,
+        max_parallel: int = 1,
     ) -> TestRunState:
         if not server_ids:
             raise ValueError("At least one server must be selected.")
@@ -93,6 +97,7 @@ class TestRunManager:
             raise ValueError("Test duration must be greater than zero.")
         if scheduling_mode not in {"equal_time", "sequential"}:
             raise ValueError("Unsupported scheduling mode.")
+        max_parallel = max(1, min(16, int(max_parallel)))
 
         state = TestRunState(
             run_id=run_id,
@@ -102,6 +107,7 @@ class TestRunManager:
             started_at=time.time(),
             total_servers=len(server_ids),
             message="Test campaign started.",
+            max_parallel=max_parallel,
         )
         stop_event = threading.Event()
         with self._lock:
@@ -146,31 +152,58 @@ class TestRunManager:
     ) -> None:
         slot_seconds = state.planned_seconds / len(server_ids)
         try:
-            for server_id in server_ids:
-                if stop_event.is_set():
-                    break
-                state.current_server_id = server_id
-                state.current_server_name = server_names.get(server_id, server_id)
-                state.current_server_started_at = time.time()
-                state.current_server_elapsed = 0.0
-                state.message = f"Testing {state.current_server_name}"
-
-                if on_server is not None:
-                    allocation = (
-                        slot_seconds
-                        if state.scheduling_mode == "equal_time"
-                        else max(0.0, state.planned_seconds - state.elapsed_seconds)
-                    )
-                    success = on_server(server_id, allocation, stop_event)
-                else:
-                    success = self._wait_slot(stop_event, slot_seconds)
-
-                state.current_server_elapsed = time.time() - state.current_server_started_at
-                if success:
-                    state.completed_servers += 1
-                else:
-                    state.failed_servers += 1
-                state.message = f"Completed {state.current_server_name}"
+            if state.scheduling_mode == "equal_time" and state.max_parallel > 1:
+                for offset in range(0, len(server_ids), state.max_parallel):
+                    if stop_event.is_set():
+                        break
+                    batch = server_ids[offset:offset + state.max_parallel]
+                    with self._lock:
+                        state.current_server_id = batch[0]
+                        state.current_server_name = ", ".join(server_names.get(item, item) for item in batch)
+                        state.current_server_started_at = time.time()
+                        state.current_server_elapsed = 0.0
+                        state.message = f"Testing {len(batch)} servers in parallel"
+                    with ThreadPoolExecutor(max_workers=len(batch), thread_name_prefix=f"vpn-bench-batch-{state.run_id}") as pool:
+                        futures = {
+                            pool.submit(self._run_one, server_id, slot_seconds, stop_event, on_server): server_id
+                            for server_id in batch
+                        }
+                        for future in as_completed(futures):
+                            success = future.result()
+                            with self._lock:
+                                if success:
+                                    state.completed_servers += 1
+                                else:
+                                    state.failed_servers += 1
+                    with self._lock:
+                        state.current_server_elapsed = time.time() - (state.current_server_started_at or time.time())
+                        state.message = f"Completed {len(batch)} servers"
+            else:
+                for server_id in server_ids:
+                    if stop_event.is_set():
+                        break
+                    with self._lock:
+                        state.current_server_id = server_id
+                        state.current_server_name = server_names.get(server_id, server_id)
+                        state.current_server_started_at = time.time()
+                        state.current_server_elapsed = 0.0
+                        state.message = f"Testing {state.current_server_name}"
+                    if on_server is not None:
+                        allocation = (
+                            slot_seconds
+                            if state.scheduling_mode == "equal_time"
+                            else max(0.0, state.planned_seconds - state.elapsed_seconds)
+                        )
+                        success = on_server(server_id, allocation, stop_event)
+                    else:
+                        success = self._wait_slot(stop_event, slot_seconds)
+                    with self._lock:
+                        state.current_server_elapsed = time.time() - (state.current_server_started_at or time.time())
+                        if success:
+                            state.completed_servers += 1
+                        else:
+                            state.failed_servers += 1
+                        state.message = f"Completed {state.current_server_name}"
 
             with self._lock:
                 state.status = "stopped" if stop_event.is_set() else "completed"
@@ -185,6 +218,12 @@ class TestRunManager:
         finally:
             with self._lock:
                 self._stop_events.pop(state.run_id, None)
+
+    @staticmethod
+    def _run_one(server_id, allocation, stop_event, on_server):
+        if on_server is not None:
+            return on_server(server_id, allocation, stop_event)
+        return TestRunManager._wait_slot(stop_event, allocation)
 
     @staticmethod
     def _wait_slot(stop_event: threading.Event, seconds: float) -> bool:
