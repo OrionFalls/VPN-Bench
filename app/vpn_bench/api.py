@@ -183,10 +183,20 @@ def build_app(config: Config) -> FastAPI:
         result = []
         for row in rows:
             item = dict(row) | {"metadata": json_loads(row["metadata_json"])}
-            item["subscription_url"] = decrypt_subscription_url(row["subscription_url_encrypted"])
+            raw_url = decrypt_subscription_url(row["subscription_url_encrypted"])\n            item["subscription_url_masked"] = raw_url[:12] + "••••" if len(raw_url) > 16 else "••••"\n            item.pop("subscription_url_encrypted", None)
             item.pop("subscription_url_encrypted", None)
             result.append(item)
         return result
+
+    @app.get("/api/v1/providers/{provider_id}/subscription-url")
+    def provider_subscription_url(provider_id: str, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            row = connection.execute(
+                "SELECT subscription_url_encrypted FROM providers WHERE id = ?", (provider_id,)
+            ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Provider not found")
+        return {"subscription_url": decrypt_subscription_url(row["subscription_url_encrypted"])}
 
     @app.post("/api/v1/providers")
     def add_provider(payload: ProviderRequest, _: str = Depends(require_auth)) -> dict:
