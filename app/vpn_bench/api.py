@@ -330,12 +330,13 @@ def build_app(config: Config) -> FastAPI:
     def servers(_: str = Depends(require_auth)) -> list[dict]:
         with db() as connection:
             rows = connection.execute(
-                "SELECT id, provider, provider_id, name, protocol, host, port, transport, security, active, last_seen_at, metadata_json "
-                "FROM servers ORDER BY active DESC, provider, name"
+                "SELECT s.id, s.provider, s.provider_id, s.name, s.protocol, s.host, s.port, s.transport, s.security, s.active, s.last_seen_at, s.metadata_json, "
+                "(SELECT r.latency_ms FROM test_results r WHERE r.server_id=s.id ORDER BY r.started_at DESC LIMIT 1) AS latency_ms, (SELECT r.download_mbps FROM test_results r WHERE r.server_id=s.id ORDER BY r.started_at DESC LIMIT 1) AS download_mbps, (SELECT r.upload_mbps FROM test_results r WHERE r.server_id=s.id ORDER BY r.started_at DESC LIMIT 1) AS upload_mbps, (SELECT r.success FROM test_results r WHERE r.server_id=s.id ORDER BY r.started_at DESC LIMIT 1) AS latest_success, (SELECT AVG(CASE WHEN r.success=1 THEN 100.0 ELSE 0.0 END) FROM test_results r WHERE r.server_id=s.id) AS availability FROM servers s ORDER BY s.active DESC, s.provider, s.name"
             ).fetchall()
         return [
             dict(row)
             | {"metadata": json_loads(row["metadata_json"])}
+            | {"latest_result": {"latency_ms": row["latency_ms"], "download_mbps": row["download_mbps"], "upload_mbps": row["upload_mbps"], "availability": row["availability"], "success": row["latest_success"]}}
             | {"capabilities": [item.__dict__ for item in detect_capabilities(row["protocol"], row["transport"])]}
             for row in rows
         ]
