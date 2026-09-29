@@ -1,4 +1,4 @@
-var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null};
+var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null,analyticsMetric:"speed",analyticsPeriod:"24h",analyticsSelected:[]};
 var app=document.getElementById("app");
 function esc(v){return String(v==null?"":v).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]})}
 function fmt(s){s=Math.max(0,Math.round(s||0));var h=Math.floor(s/3600);s%=3600;var m=Math.floor(s/60),x=s%60;return (h?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(x).padStart(2,"0")}
@@ -44,12 +44,13 @@ function providerRows(){return state.providers.map(function(p){var n=state.serve
 function providers(){app.innerHTML=head("Провайдеры","Управление подписками и настройками провайдеров",'<button class="btn" onclick="providerForm()">Добавить провайдера</button>')+'<div class="card table-card"><div class="table-scroll"><table class="table provider-table"><thead><tr><th></th><th>Название</th><th>URL подписки</th><th>Серверов</th><th>Статус</th><th>Обновлено</th><th>Действия</th></tr></thead><tbody>'+(providerRows()||'<tr><td colspan="7" class="empty">Провайдеров пока нет</td></tr>')+'</tbody></table></div></div>'}
 function providerForm(id){
   var p=id?state.providers.find(function(x){return x.id===id}):null;
-  var name=p?esc(p.display_name||p.name):"";
+  var name=p?esc(p.display_name||""):"";
   var url=p?esc(p.subscription_url||""):"";
   var title=p?"Редактировать провайдера":"Добавить провайдера";
   app.innerHTML=head(title,"Подключение подписки и параметры обновления")+
     '<div class="card form-card"><div class="form-grid">'+
-    '<label>Название<span>*</span><input id="pn" class="input" value="'+name+'" placeholder="Определится автоматически"></label>'+
+    '<label>Название<span class="optional">необязательно</span><input id="pn" class="input" value="'+name+'" placeholder="Оставьте пустым — определится автоматически"></label>'+
+    '<div class="field-help">Если оставить поле пустым, VPN-Bench попробует определить название из метаданных подписки. Позже его можно изменить вручную.</div>'+
     '<label>URL подписки<span>*</span><input id="pu" class="input" value="'+url+'" placeholder="https://example.com/sub"></label>'+
     '<label>Тип подписки<select id="pt" class="input"><option>Автоопределение</option></select></label>'+
     '<label>Описание<input id="pd" class="input" placeholder="Необязательно"></label></div>'+
@@ -61,15 +62,110 @@ function providerForm(id){
 async function saveProvider(id){var name=document.getElementById("pn").value.trim(),url=document.getElementById("pu").value.trim();if(!url)return alert("Укажите URL подписки");try{var body={name:name,display_name:name||null,subscription_url:url,enabled:true};var p=await api(id?"/api/v1/providers/"+id:"/api/v1/providers",{method:id?"PUT":"POST",body:JSON.stringify(body)});await api("/api/v1/providers/"+p.id+"/sync",{method:"POST"});await refresh();state.page="providers";render()}catch(e){alert(e.message)}}
 function editProvider(id){providerForm(id)}
 async function syncProvider(id){try{var r=await api("/api/v1/providers/"+id+"/sync",{method:"POST"});await refresh();render();alert("Импортировано серверов: "+r.servers)}catch(e){alert(e.message)}}
-function filteredServers(){var f=state.serverFilters;return state.servers.filter(function(s){var name=String(s.name||"").toLowerCase();var provider=String(s.provider||"");var protocol=String(s.protocol||"");var active=!!s.active;return (!f.provider||String(s.provider_id||"")===f.provider||provider===f.provider)&&(!f.protocol||protocol===f.protocol)&&(!f.status||(f.status==="online"&&active)||(f.status==="offline"&&!active))&&(!f.search||name.indexOf(f.search.toLowerCase())>=0)})}
-function filterOptions(list,value){return list.filter(function(x,i){return list.indexOf(x)===i}).sort().map(function(x){return '<option value="'+esc(x)+'" '+(x===value?"selected":"")+'>'+esc(x)+'</option>'}).join("")}
+function countryOf(s){
+  var m=s.metadata||{};
+  return m.country||m.country_name||m.country_code||m.region||"";
+}
+function matchesRegexFilters(s){
+  var expressions=state.filters.map(function(x){return String(x||"").trim()}).filter(Boolean);
+  if(!expressions.length)return true;
+  var hay=[s.name,s.provider,s.protocol,s.transport,s.security,countryOf(s)].join(" ");
+  return expressions.every(function(expr){
+    try{return !new RegExp(expr,"i").test(hay)}
+    catch(_){return hay.toLowerCase().indexOf(expr.toLowerCase())<0}
+  });
+}
+function filteredServers(){
+  var f=state.serverFilters;
+  return state.servers.filter(function(s){
+    var name=String(s.name||"").toLowerCase();
+    var provider=String(s.provider||"");
+    var protocol=String(s.protocol||"");
+    var country=countryOf(s);
+    var active=!!s.active;
+    return matchesRegexFilters(s)&&
+      (!f.provider||String(s.provider_id||"")===f.provider||provider===f.provider)&&
+      (!f.country||country===f.country)&&
+      (!f.protocol||protocol===f.protocol)&&
+      (!f.status||(f.status==="online"&&active)||(f.status==="offline"&&!active))&&
+      (!f.search||name.indexOf(f.search.toLowerCase())>=0);
+  });
+}
+function filterOptions(list,value){
+  return list.filter(function(x){return x}).filter(function(x,i,a){return a.indexOf(x)===i}).sort().map(function(x){
+    return '<option value="'+esc(x)+'" '+(x===value?"selected":"")+'>'+esc(x)+'</option>';
+  }).join("");
+}
 function updateServerFilter(key,value){state.serverFilters[key]=value;render()}
-function serverRows(){return filteredServers().map(function(s,i){return '<tr onclick="openServer(&quot;'+s.id+'&quot;)"><td><input type="checkbox" onclick="event.stopPropagation();toggle(&quot;'+s.id+'&quot;,this.checked)" '+(state.selected[s.id]?"checked":"")+'></td><td>'+((i+1))+'</td><td>'+esc(s.provider)+'</td><td><b>'+flag(s.name)+' '+esc(s.name)+'</b></td><td>'+flag(s.name)+'</td><td>'+esc(s.protocol||"—")+'</td><td>—</td><td>—</td><td>'+badge(s.active?"Онлайн":"Неактивен",s.active?"good":"bad")+'</td></tr>'}).join("")}
-function servers(){var ps=state.servers.map(function(s){return s.provider||""}),protocols=state.servers.map(function(s){return s.protocol||""});var f=state.serverFilters;var rows=filteredServers();app.innerHTML=head("Серверы","Все серверы от подключенных провайдеров")+'<div class="filters"><select class="input" onchange="updateServerFilter(&quot;provider&quot;,this.value)"><option value="">Все провайдеры</option>'+filterOptions(ps,f.provider)+'</select><select class="input"><option value="">Все страны</option></select><select class="input" onchange="updateServerFilter(&quot;protocol&quot;,this.value)"><option value="">Все протоколы</option>'+filterOptions(protocols,f.protocol)+'</select><select class="input" onchange="updateServerFilter(&quot;status&quot;,this.value)"><option value="">Все статусы</option><option value="online" '+(f.status==="online"?"selected":"")+'>Онлайн</option><option value="offline" '+(f.status==="offline"?"selected":"")+'>Неактивен</option></select><input class="input" value="'+esc(f.search)+'" oninput="updateServerFilter(&quot;search&quot;,this.value)" placeholder="⌕  Поиск по названию"></div><div class="card table-card"><div class="table-scroll"><table class="table server-table"><thead><tr><th></th><th>#</th><th>Провайдер</th><th>Сервер</th><th>Страна</th><th>Протокол</th><th>Задержка</th><th>Скорость ↓</th><th>Статус</th></tr></thead><tbody>'+(serverRows()||'<tr><td colspan="9" class="empty">По фильтрам ничего не найдено</td></tr>')+'</tbody></table></div><div class="pager">Показано '+(rows.length?1:0)+'–'+rows.length+' из '+state.servers.length+'</div></div>'}
+function serverRows(){
+  return filteredServers().map(function(s,i){
+    var country=countryOf(s)||"—";
+    var detail=(s.protocol||"—")+" · "+(s.transport||"—")+" · "+(s.security||"—");
+    return '<tr onclick="openServer(&quot;'+s.id+'&quot;)"><td><input type="checkbox" onclick="event.stopPropagation();toggle(&quot;'+s.id+'&quot;,this.checked)" '+(state.selected[s.id]?"checked":"")+'></td><td>'+((i+1))+'</td><td>'+esc(s.provider)+'</td><td><b>'+flag(s.name)+' '+esc(s.name)+'</b></td><td>'+esc(country)+'</td><td title="'+esc(detail)+'">'+esc(s.protocol||"—")+'<small class="table-sub">'+esc((s.transport||"—")+" / "+(s.security||"—"))+'</small></td><td>—</td><td>—</td><td>'+badge(s.active?"Онлайн":"Неактивен",s.active?"good":"bad")+'</td></tr>'
+  }).join("");
+}
+function servers(){
+  var ps=state.servers.map(function(s){return s.provider||""});
+  var countries=state.servers.map(countryOf);
+  var protocols=state.servers.map(function(s){return s.protocol||""});
+  var f=state.serverFilters;
+  var rows=filteredServers();
+  app.innerHTML=head("Серверы","Все серверы от подключенных провайдеров")+
+    '<div class="filters"><select class="input" title="Фильтр по провайдеру" onchange="updateServerFilter(&quot;provider&quot;,this.value)"><option value="">Все провайдеры</option>'+filterOptions(ps,f.provider)+'</select>'+
+    '<select class="input" title="Фильтр по стране" onchange="updateServerFilter(&quot;country&quot;,this.value)"><option value="">Все страны</option>'+filterOptions(countries,f.country)+'</select>'+
+    '<select class="input" title="Фильтр по протоколу, транспорту и защите" onchange="updateServerFilter(&quot;protocol&quot;,this.value)"><option value="">Все протоколы</option>'+filterOptions(protocols,f.protocol)+'</select>'+
+    '<select class="input" title="Только активные или неактивные серверы" onchange="updateServerFilter(&quot;status&quot;,this.value)"><option value="">Все статусы</option><option value="online" '+(f.status==="online"?"selected":"")+'>Онлайн</option><option value="offline" '+(f.status==="offline"?"selected":"")+'>Неактивен</option></select>'+
+    '<input class="input" value="'+esc(f.search)+'" oninput="updateServerFilter(&quot;search&quot;,this.value)" placeholder="⌕  Поиск по названию" title="Быстрый поиск по названию сервера"></div>'+
+    '<div class="card table-card"><div class="table-scroll"><table class="table server-table"><thead><tr><th></th><th>#</th><th>Провайдер</th><th>Сервер</th><th>Страна</th><th>Протокол</th><th>Задержка</th><th>Скорость ↓</th><th>Статус</th></tr></thead><tbody>'+
+    (serverRows()||'<tr><td colspan="9" class="empty">По фильтрам ничего не найдено</td></tr>')+
+    '</tbody></table></div><div class="pager">Показано '+(rows.length?1:0)+'–'+rows.length+' из '+state.servers.length+'</div></div>';
+}
 async function openServer(id){state.serverDetail=await api("/api/v1/servers/"+id);serverDetail()}
 function metric(label,value,unit,kind){return '<div class="metric"><span class="metric-icon '+(kind||"blue")+'">◉</span><div><small>'+label+'</small><b>'+value+(unit?" <em>"+unit+"</em>":"")+'</b></div></div>'}
 function resultStatus(v){return v===true?'<span class="ok">Доступен</span>':v===false?'<span class="err">Недоступен</span>':'—'}
 function serverDetail(){var s=state.serverDetail;if(!s)return;var rs=s.results||[],latest=rs[0]||{};var name=esc(s.name),title=flag(s.name)+" "+name;var speedData=rs.slice().reverse().map(function(r){return {download_mbps:r.download_mbps,upload_mbps:r.upload_mbps}});var lossData=rs.slice().reverse().map(function(r){return {download_mbps:r.latency_ms,upload_mbps:r.packet_loss_percent}});app.innerHTML='<div class="detail-head"><button class="back" onclick="state.page=\'servers\';render()">← Серверы</button><div class="server-title"><div class="big-flag">'+flag(s.name)+'</div><div><h1>'+name+'</h1><div class="muted">'+esc(s.provider)+' · '+esc(s.protocol||"—")+' · '+esc(s.transport||"—")+' · '+esc(s.security||"—")+'</div></div></div><div class="head-actions"><button class="btn" onclick="state.selected={};state.selected[\''+s.id+'\']=true;state.page=\'tests\';render()">Запустить тест</button><button class="icon-btn">⋮</button></div></div><div class="tabs"><button class="active">Обзор</button><button>Графики</button><button>История тестов</button><button>Технические данные</button><button>Логи</button></div><div class="detail-grid"><div class="card metrics-card"><div class="card-head"><h3>Текущие показатели</h3><span>'+badge(s.active?"Онлайн":"Неактивен",s.active?"good":"bad")+'</span></div>'+metric("Задержка",num(latest.latency_ms,0),"ms","blue")+metric("Скорость загрузки",num(latest.download_mbps,0),"Мбит/с","cyan")+metric("Скорость отдачи",num(latest.upload_mbps,0),"Мбит/с","green")+metric("Потери пакетов",num(latest.packet_loss_percent,1),"%","red")+metric("Стабильность",latest.success==null?"—":latest.success?"99.9%":"0%","",latest.success?"green":"red")+metric("Jitter",num(latest.jitter_ms,0),"ms","violet")+metric("DNS",resultStatus(latest.dns_ok),"","blue")+metric("HTTP",resultStatus(latest.http_ok),"","cyan")+'<div class="service-list"><span>'+statusDot(true)+'YouTube <b>'+resultStatus((latest.details||{}).youtube_ok)+'</b></span><span>'+statusDot(true)+'Telegram <b>'+resultStatus((latest.details||{}).telegram_ok)+'</b></span><span>'+statusDot(true)+'GitHub <b>'+resultStatus((latest.details||{}).github_ok)+'</b></span></div></div><div><div class="card chart-card"><div class="card-head"><div><h3>Скорость</h3><span class="muted">Последние измерения</span></div><div class="chart-legend"><span><i class="legend-dot blue-dot"></i>Загрузка</span><span><i class="legend-dot green-dot"></i>Отдача</span></div></div>'+miniChart(speedData,700,230)+'</div><div class="card chart-card" style="margin-top:16px"><div class="card-head"><div><h3>Задержка и потери пакетов</h3><span class="muted">Последние измерения</span></div></div>'+miniChart(lossData,700,180)+'</div></div></div>'}
+function analytics(){
+  var rows=[];
+  var metric=state.analyticsMetric;
+  var period=state.analyticsPeriod;
+  var metricLabel={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"}[metric];
+  api("/api/v1/analytics").then(function(data){
+    rows=data||[];
+    var selected=state.analyticsSelected.filter(function(id){return rows.some(function(r){return r.id===id})}).slice(0,5);
+    state.analyticsSelected=selected;
+    var values=function(r){
+      if(metric==="speed")return {a:r.download_mbps,b:r.upload_mbps,au:"Мбит/с",bu:"Мбит/с"};
+      if(metric==="latency")return {a:r.latency_ms,b:r.jitter_ms,au:"ms",bu:"jitter"};
+      if(metric==="loss")return {a:r.packet_loss_percent,b:null,au:"%",bu:""};
+      if(metric==="availability")return {a:r.availability,b:null,au:"%",bu:""};
+      return {a:r.samples,b:null,au:"проверок",bu:""};
+    };
+    var options=rows.map(function(r){return '<option value="'+esc(r.id)+'" '+(selected.indexOf(r.id)>=0?"selected":"")+'>'+esc(r.provider)+" · "+esc(r.name)+'</option>'}).join("");
+    var cards=selected.map(function(id){
+      var r=rows.find(function(x){return x.id===id})||{};
+      var v=values(r);
+      return '<div class="compare-metric"><b>'+esc(r.name||"—")+'</b><div class="compare-value"><span>'+metricLabel+'</span><strong>'+num(v.a,metric==="availability"||metric==="loss"?1:0)+(v.au?" "+v.au:"")+'</strong></div>'+(v.b!=null?'<div class="compare-value"><span>'+esc(v.bu)+'</span><strong>'+num(v.b,1)+'</strong></div>':"")+'</div>';
+    }).join("");
+    var table=selected.map(function(id){
+      var r=rows.find(function(x){return x.id===id})||{};
+      return '<tr><td>'+esc(r.provider)+'</td><td>'+esc(r.name)+'</td><td>'+num(r.download_mbps,0)+'</td><td>'+num(r.upload_mbps,0)+'</td><td>'+num(r.latency_ms,1)+'</td><td>'+num(r.jitter_ms,1)+'</td><td>'+num(r.packet_loss_percent,2)+'</td><td>'+num(r.availability,1)+'%</td></tr>';
+    }).join("");
+    var chartData=selected.length?selected.map(function(id){return rows.find(function(x){return x.id===id})}).filter(Boolean):rows.slice(0,8);
+    var max=1;
+    chartData.forEach(function(r){var v=values(r).a;if(v!=null)max=Math.max(max,Number(v)||0)});
+    var bars=chartData.map(function(r){
+      var v=values(r).a;
+      var pct=v==null?0:Math.max(4,Math.round(Number(v)/max*100));
+      return '<div class="metric-bar"><div><span>'+esc(r.name)+'</span><b>'+num(v,metric==="loss"||metric==="availability"?1:0)+(values(r).au?" "+values(r).au:"")+'</b></div><div class="bar-track"><i style="width:'+pct+'%"></i></div></div>';
+    }).join("");
+    app.innerHTML=head("Графики / Сравнение","История показателей и сопоставление серверов")+
+      '<div class="card analytics-card"><div class="analytics-toolbar"><select class="input" onchange="state.analyticsMetric=this.value;render()" title="Что именно измеряем"><option value="speed" '+(metric==="speed"?"selected":"")+'>Скорость</option><option value="latency" '+(metric==="latency"?"selected":"")+'>Задержка</option><option value="loss" '+(metric==="loss"?"selected":"")+'>Потери пакетов</option><option value="availability" '+(metric==="availability"?"selected":"")+'>Доступность</option><option value="sites" '+(metric==="sites"?"selected":"")+'>Сайты</option></select><select class="input" onchange="state.analyticsPeriod=this.value;render()" title="Период анализа"><option value="24h" '+(period==="24h"?"selected":"")+'>24 часа</option><option value="7d" '+(period==="7d"?"selected":"")+'>7 дней</option><option value="30d" '+(period==="30d"?"selected":"")+'>30 дней</option></select><select class="input" multiple size="1" onchange="state.analyticsSelected=Array.from(this.selectedOptions).map(function(o){return o.value}).slice(0,5);render()" title="Выберите до 5 серверов">'+options+'</select></div>'+
+      '<div class="analytics-tabs">'+["speed","latency","loss","availability","sites"].map(function(k){var labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"};return '<button class="'+(metric===k?"active":"")+'" onclick="state.analyticsMetric=''+k+'';render()">'+labels[k]+'</button>}).join("")+'</div>'+
+      '<div class="card large-chart"><div class="card-head"><div><h3>'+metricLabel+'</h3><span class="muted">Период: '+period+' · одинаковая шкала для выбранных серверов</span></div></div><div class="metric-bars">'+(bars||'<div class="empty">Недостаточно данных для графика</div>')+'</div></div>'+
+      '<div class="card compare-card"><div class="card-head"><div><h3>Сравнение</h3><span class="muted">Не более 5 серверов одновременно</span></div></div><div class="compare-grid">'+(cards||'<div class="empty-chip">Выберите серверы для сравнения</div>')+'</div></div>'+
+      '<div class="card table-card"><div class="card-head"><h3>Сводная таблица</h3></div><div class="table-scroll"><table class="table analytics-table"><thead><tr><th>Провайдер</th><th>Сервер</th><th>Download</th><th>Upload</th><th>Ping</th><th>Jitter</th><th>Loss</th><th>Доступность</th></tr></thead><tbody>'+(table||'<tr><td colspan="8" class="empty">Выберите серверы</td></tr>')+'</tbody></table></div></div></div>';
+  }).catch(function(e){app.innerHTML=head("Графики / Сравнение","Не удалось загрузить аналитику")+'<div class="card"><p>'+esc(e.message)+'</p></div>'});
+}
 function tests(){
   var count=Object.keys(state.selected).length;
   var screen=state.screening;
@@ -113,9 +209,14 @@ function tests(){
   document.getElementById("unit").onchange=function(){state.duration=Number(document.getElementById("dur").value)*Number(this.value)};
   loadStatus();loadScreening();
 }
+function setMode(mode){state.mode=mode;render()}
 function toggleProvider(providerId,on){var p=state.providers.find(function(x){return x.id===providerId});if(!p)return;state.servers.filter(function(s){return s.provider_id===p.id||s.provider===p.name}).forEach(function(s){toggle(s.id,on)});render()}
 function clearSelection(){state.selected={};render()}
-function filterHtml(){return '<div class="filter-list">'+state.filters.map(function(v,i){return '<div class="filter"><input class="input" value="'+esc(v)+'" placeholder="Поиск или regex-исключение" oninput="state.filters['+i+']=this.value"><button class="icon-btn" onclick="removeFilter('+i+')">×</button></div>'}).join("")+'<button class="btn secondary filter-add" onclick="addFilter()">+ Добавить фильтр</button></div>'}
+function filterHtml(){
+  return '<div class="filter-list"><div class="field-help">Каждый фильтр — регулярное выражение для исключения серверов. Например, <code>LTE</code> исключит все серверы, в имени которых есть LTE. Ошибочный regex обрабатывается как обычный поиск.</div>'+
+    state.filters.map(function(v,i){return '<div class="filter"><input class="input" value="'+esc(v)+'" placeholder="Например: LTE" title="Regex-фильтр: найденные серверы будут исключены" oninput="state.filters['+i+']=this.value;render()"><button class="icon-btn" onclick="removeFilter('+i+')" title="Удалить фильтр">×</button></div>'}).join("")+
+    '<button class="btn secondary filter-add" onclick="addFilter()">+ Добавить фильтр</button></div>'
+}
 function addFilter(){state.filters.push("");render()}
 function removeFilter(i){if(state.filters.length===1){state.filters[0]="";render();return}state.filters.splice(i,1);render()}
 function toggle(id,on){if(on)state.selected[id]=true;else delete state.selected[id]}
@@ -123,7 +224,19 @@ async function startTest(){var ids=Object.keys(state.selected);if(!ids.length)re
 async function loadStatus(){try{var t=await api("/api/v1/tests/latest"),el=document.getElementById("test-status");if(!el)return;el.innerHTML=summary(t)+(t.status==="running"||t.status==="stopping"?'<button class="btn danger" onclick="stopTest(&quot;'+t.run_id+'&quot;)">Остановить</button>':"");if(t.status==="running"||t.status==="stopping")setTimeout(loadStatus,1000)}catch(_){ }}
 async function stopTest(id){await api("/api/v1/tests/"+id+"/stop",{method:"POST"});loadStatus()}
 async function logs(){var rows=await api("/api/v1/logs?level=all&limit=100");var body=rows.map(function(r){return '<div class="log-row"><time>'+esc(r.created_at)+'</time><b class="log-'+String(r.level).toLowerCase()+'">'+esc(r.level)+'</b><span>'+esc(r.message)+'</span></div>'}).join("");app.innerHTML=head("Логи","Системные логи и события",'<div class="head-actions"><select class="input small"><option>Все уровни</option></select><button class="btn secondary">Очистить</button></div>')+'<div class="card log-card">'+(body||'<div class="empty">Системных событий пока нет</div>')+'</div>'}
-function settings(){app.innerHTML=head("Настройки","Конфигурация системы")+'<div class="settings-tabs"><button class="active">Основные</button><button>Профиль</button><button>Планировщик</button><button>Уведомления</button><button>Система</button></div><div class="card form-card"><h3>Основные</h3><div class="setting-row"><span><b>Параллельные тесты</b><small>Количество одновременно запускаемых проверок</small></span><input class="input short" value="1"></div><div class="setting-row"><span><b>Интервал полного теста</b><small>Период между полными циклами</small></span><select class="input short"><option>1 час</option><option>6 часов</option><option>24 часа</option></select></div><div class="setting-row"><span><b>Интервал быстрого теста</b><small>Период между быстрыми проверками</small></span><select class="input short"><option>5 минут</option><option>15 минут</option><option>1 час</option></select></div><div class="setting-row"><span><b>Автообновление</b><small>Автоматически обновлять подписки</small></span><input type="checkbox" checked></div><div class="setting-row"><span><b>Сохранять историю</b><small>Хранить результаты измерений</small></span><input type="checkbox" checked></div><div class="setting-row"><span><b>Срок хранения</b><small>Удаление старых измерений</small></span><select class="input short"><option>30 дней</option><option>90 дней</option><option>180 дней</option></select></div><div class="setting-row"><span><b>Использовать IPv6</b><small>Разрешить IPv6 для проверок</small></span><input type="checkbox"></div><div class="form-actions"><button class="btn secondary">Отмена</button><button class="btn">Сохранить</button></div></div><div class="card form-card"><h3>Безопасность</h3><p class="muted">Смена пароля администратора.</p><button class="btn secondary" onclick="changePassword()">Изменить пароль</button></div>'}
-async function changePassword(){var a=prompt("Текущий пароль"),b=prompt("Новый пароль (минимум 12 символов)");if(!a||!b)return;try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});alert("Пароль изменён")}catch(e){alert(e.message)}}
+function settings(){
+  app.innerHTML=head("Настройки","Конфигурация системы")+
+  '<div class="settings-tabs"><button class="active">Основные</button><button>Профиль</button><button>Планировщик</button><button>Уведомления</button><button>Система</button></div>'+
+  '<div class="card form-card"><h3>Основные</h3>'+
+  '<div class="setting-row"><span><b>Параллельные тесты</b><small>Количество одновременно запускаемых проверок</small></span><input class="input short" value="1" title="Сколько серверов можно проверять одновременно"></div>'+
+  '<div class="setting-row"><span><b>Автообновление подписок</b><small>Автоматически обновлять данные провайдеров</small></span><input type="checkbox" checked></div>'+
+  '<div class="setting-row"><span><b>Сохранять историю</b><small>Хранить результаты измерений</small></span><input type="checkbox" checked></div>'+
+  '<div class="setting-row"><span><b>Срок хранения</b><small>Удаление старых измерений</small></span><select class="input short"><option>30 дней</option><option>90 дней</option><option>180 дней</option><option>365 дней</option></select></div>'+
+  '<div class="setting-row"><span><b>Использовать IPv6</b><small>Разрешить IPv6 для проверок</small></span><input type="checkbox"></div>'+
+  '<div class="form-actions"><button class="btn secondary">Отмена</button><button class="btn">Сохранить</button></div></div>'+
+  '<div class="card form-card"><h3>Безопасность</h3><p class="muted">Смена пароля администратора. После смены активная сессия будет перевыпущена.</p><button class="btn secondary" onclick="changePassword()">Изменить пароль</button></div>'+
+  '<div class="card form-card"><h3>Система</h3><div class="setting-row"><span><b>VPN-Bench</b><small>Текущая версия и обновления</small></span><span class="badge">v0.2.0 · проверка обновлений</span></div><div class="form-actions"><button class="btn secondary">Что нового</button><button class="btn">Проверить обновления</button></div></div>'
+}
+function changePassword(){var a=prompt("Текущий пароль"),b=prompt("Новый пароль (минимум 12 символов)");if(!a||!b)return;try{await api("/api/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:a,new_password:b})});alert("Пароль изменён")}catch(e){alert(e.message)}}
 function startApp(){nav();boot()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",startApp,{once:true});else startApp();
