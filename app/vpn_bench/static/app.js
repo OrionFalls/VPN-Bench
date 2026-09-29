@@ -89,20 +89,28 @@ function donut(opt,warn,fail){
 }
 async function dashboard(){
   var d=await api("/api/v1/dashboard"),t=d.test||{},top=d.top_servers||[];
-  var rows=top.map(function(r,i){return '<tr><td>'+String(i+1).padStart(2,"0")+'</td><td>'+esc(r.provider)+'</td><td><span class="server-name">'+(flag(r.name)?flag(r.name)+" ":"")+esc(displayServerName(r.name))+'</span></td><td>'+num(r.latency_ms,0)+' ms</td><td><b>'+num(r.download_mbps,0)+'</b> Мбит/с</td><td>'+num(r.availability,1)+'%</td></tr>'}).join("");
+  var providersCount=Number(d.providers||0),serversCount=Number(d.servers||0),testingCount=Number(d.testing_now||0);
+  var goodCount=Number(d.optimal||0),warningCount=Number(d.warning||0),failedCount=Number(d.failed||0);
+  var totalAvailability=goodCount+warningCount+failedCount;
+  var availabilityPct=totalAvailability?Math.round(goodCount/totalAvailability*100):0;
+  var trend=d.speed_trend||[];
+  var topCards=top.slice(0,5).map(function(r){
+    var info=countryInfo(r.name),server=displayServerName(r.name);
+    return '<article class="top-server-card"><div class="top-server-provider">'+esc(r.provider||"—")+'</div><div class="top-server-main"><b>'+esc(info.flag?info.flag+" ":"")+esc(server)+'</b><div class="top-server-tech"><span>'+esc(r.protocol||"—")+'</span><i></i><span>'+esc(r.transport||"—")+'</span><i></i><span>'+esc(r.security||"—")+'</span></div></div><div class="top-server-metrics"><div><span>Доступность</span><b>'+num(r.availability,1)+'%</b></div><div><span>Скорость</span><b>'+num(r.download_mbps,0)+' Мбит/с</b></div><div><span>Задержка</span><b>'+num(r.latency_ms,0)+' мс</b></div></div></article>';
+  }).join("");
   var html=head("Дашборд","Краткая статистика по всем провайдерам и серверам",'<span class="updated"><span class="pulse"></span>Обновлено: сейчас</span>');
   html+='<div class="stats">';
-  html+='<div class="kpi"><span class="kpi-icon blue">'+icon("providers")+'</span><div><b>'+d.providers+'</b><span>Провайдеров</span><small>Подключено</small></div></div>';
-  html+='<div class="kpi"><span class="kpi-icon violet">'+icon("servers")+'</span><div><b>'+d.servers+'</b><span>Серверов</span><small>Всего</small></div></div>';
-  html+='<div class="kpi"><span class="kpi-icon cyan">'+icon("tests")+'</span><div><b>'+d.testing_now+'</b><span>Тестируется</span><small>Сейчас</small></div></div>';
-  html+='<div class="kpi"><span class="kpi-icon green">'+icon("check")+'</span><div><b>'+d.optimal+'</b><span>Оптимальных</span><small>По накопленным данным</small></div></div></div>';
+  html+='<div class="kpi"><span class="kpi-icon blue">'+icon("providers")+'</span><div><b>'+providersCount+'</b><span>Провайдеров</span><small>Подключено</small></div></div>';
+  html+='<div class="kpi"><span class="kpi-icon violet">'+icon("servers")+'</span><div><b>'+serversCount+'</b><span>Серверов</span><small>Всего</small></div></div>';
+  html+='<div class="kpi kpi-testing"><div class="kpi-left"><span class="kpi-icon cyan">'+icon("tests")+'</span><div><b>'+testingCount+'</b><span>Тестируется</span><small>Сейчас</small></div></div><em>'+(testingCount?Math.round((t.completed_servers||0)/Math.max(1,t.total_servers||1)*100):"—")+'%</em></div>';
+  html+='<div class="kpi"><span class="kpi-icon green">'+icon("check")+'</span><div><b>'+goodCount+'</b><span>Оптимальных</span><small>По накопленным данным</small></div></div></div>';
   html+='<div class="dashboard-grid">';
-  html+='<section class="card chart-card"><div class="card-head"><div><h3>Средняя скорость по времени</h3><p>Загрузка и отдача за последние 24 часа</p></div><div class="chart-legend"><span><i class="legend-dot blue-dot"></i>Загрузка</span><span><i class="legend-dot green-dot"></i>Отдача</span></div></div>'+dashboardChart(d.speed_trend,720,230)+'</section>';
-  html+='<section class="card availability"><div class="card-head"><div><h3>Доступность серверов</h3><p>По накопленным измерениям</p></div></div>'+donut(d.optimal,d.warning,d.failed)+'</section></div>';
-  html+='<section class="card table-card"><div class="card-head"><div><h3>Топ серверы</h3><p>По доступности, задержке и скорости</p></div><button class="btn secondary" onclick="state.page=\'servers\';render()">Все серверы <span>'+icon("arrow")+'</span></button></div><div class="table-scroll"><table class="table"><thead><tr><th>#</th><th>Провайдер</th><th>Сервер</th><th>Задержка</th><th>Скорость ↓</th><th>Доступность</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" class="empty">Измерений пока нет</td></tr>')+'</tbody></table></div></section>';
-  if(t.status==="running")html+='<section class="card live-card"><div class="card-head"><div><h3>Тестирование сейчас</h3><p>'+esc(t.current_server_name||"Подготовка")+'</p></div><b>'+t.completed_servers+" / "+t.total_servers+'</b></div>'+summary(t)+'</section>';
+  html+='<section class="card chart-card"><div class="card-head"><div><h3>Средняя скорость по времени</h3><p>Загрузка и отдача за последние 24 часа</p></div><div class="chart-legend"><span><i class="legend-dot blue-dot"></i>Загрузка</span><span><i class="legend-dot green-dot"></i>Отдача</span></div></div>'+dashboardChart(trend,1065,180)+'</section>';
+  html+='<section class="card availability"><div class="card-head"><div><h3>Доступность серверов</h3><p>по накопленным измерениям</p></div></div><div class="availability-inner"><div class="donut donut-figma" style="--p:'+availabilityPct+'%"><div><b>'+availabilityPct+'%</b><span>доступно</span></div></div><div class="legend"><span><i class="lg good"></i>Доступно <b>'+goodCount+'</b></span><span><i class="lg warn"></i>Таймаут <b>'+warningCount+'</b></span><span><i class="lg bad"></i>Ошибка <b>'+failedCount+'</b></span></div></div></section></div>';
+  html+='<section class="dashboard-top"><div class="top-section-head"><div><h3>Топ 5 серверов</h3><p>по совокупности параметров</p></div></div><div class="top-server-grid">'+(topCards||'<div class="empty">Недостаточно данных для рейтинга</div>')+'</div></section>';
+  if(t.status==="running"||t.status==="stopping")html+='<section class="card live-card"><div class="card-head"><div><h3>Тестирование сейчас</h3><p>'+esc(t.current_server_name||"Подготовка")+'</p></div><b>'+t.completed_servers+" / "+t.total_servers+'</b></div>'+summary(t)+'</section>';
   app.innerHTML=html;
-  if(t.status==="running")setTimeout(dashboard,1000);
+  if(t.status==="running"||t.status==="stopping")setTimeout(dashboard,1000);
 }
 function summary(t){
   if(!t||t.status==="idle")return '<div class="empty-state"><div class="empty-icon">'+icon("check")+'</div><b>Тестирование не запущено</b><span>Выберите серверы и запустите тест в разделе «Тесты».</span></div>';
