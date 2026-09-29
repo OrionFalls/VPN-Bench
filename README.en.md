@@ -1,8 +1,6 @@
-# ⚡ VPN-Bench
-
 <div align="center">
 
-<img src="assets/logo.svg" alt="VPN-Bench" width="190">
+<img src="assets/LOGO dark.svg" alt="VPN-Bench" width="500">
 
 ### Real-world VPN server benchmarking
 
