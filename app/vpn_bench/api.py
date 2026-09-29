@@ -301,6 +301,24 @@ def build_app(config: Config) -> FastAPI:
             for row in rows
         ]
 
+    @app.get("/api/v1/servers/{server_id}")
+    def server_detail(server_id: str, _: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            row = connection.execute(
+                "SELECT id, provider_id, provider, name, protocol, host, port, transport, security, active, last_seen_at, metadata_json FROM servers WHERE id = ?",
+                (server_id,),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Server not found")
+            results = connection.execute(
+                "SELECT started_at, duration_seconds, success, latency_ms, jitter_ms, packet_loss_percent, download_mbps, upload_mbps, dns_ok, http_ok, whitelist_ok, details_json FROM test_results WHERE server_id = ? ORDER BY started_at DESC LIMIT 200",
+                (server_id,),
+            ).fetchall()
+        data = dict(row) | {"metadata": json_loads(row["metadata_json"])}
+        data["capabilities"] = [item.__dict__ for item in detect_capabilities(row["protocol"], row["transport"])]
+        data["results"] = [dict(item) | {"details": json_loads(item["details_json"])} for item in results]
+        return data
+
     @app.get("/api/v1/filters")
     def filters(scope: str = "test", _: str = Depends(require_auth)) -> list[dict]:
         with db() as connection:
