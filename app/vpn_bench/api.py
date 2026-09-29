@@ -157,6 +157,18 @@ def build_app(config: Config) -> FastAPI:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
         return vpn_bench_session
 
+
+    def prune_history(connection: sqlite3.Connection, retention_days: int) -> None:
+        cutoff = f"-{max(1, int(retention_days))} days"
+        connection.execute(
+            "DELETE FROM test_results WHERE started_at < datetime('now', ?)",
+            (cutoff,),
+        )
+        connection.execute(
+            "DELETE FROM screening_results WHERE started_at < datetime('now', ?)",
+            (cutoff,),
+        )
+
     @app.get("/", response_class=HTMLResponse)
     def root() -> HTMLResponse:
         return page()
@@ -525,6 +537,7 @@ def build_app(config: Config) -> FastAPI:
                             else None,
                             json.dumps(result["details"], ensure_ascii=False),
                         ),
+                    prune_history(connection, current_settings["retention_days"])
                     )
 
             return worker.run_server(
