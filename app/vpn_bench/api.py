@@ -95,6 +95,14 @@ class ScreeningTestStartRequest(BaseModel):
     scheduling_mode: str = Field(pattern="^(equal_time|sequential)$")
 
 
+class SettingsRequest(BaseModel):
+    parallel_tests: int = Field(default=1, ge=1, le=16)
+    auto_update_subscriptions: bool = True
+    save_history: bool = True
+    retention_days: int = Field(default=90, ge=1, le=3650)
+    ipv6: bool = False
+
+
 class ScreeningStartRequest(BaseModel):
     server_ids: list[str] = Field(min_length=1)
     first_pass_seconds: int = Field(default=30, gt=0, le=300)
@@ -117,6 +125,26 @@ def build_app(config: Config) -> FastAPI:
     def write_log(level: str, message: str, context: dict | None = None) -> None:
         with db() as connection:
             connection.execute("INSERT INTO logs(created_at, level, message, context_json) VALUES(?,?,?,?)", (utc_now(), level.upper(), message, json.dumps(context or {}, ensure_ascii=False)))
+
+    def load_settings(connection: sqlite3.Connection) -> dict:
+        defaults = {
+            "parallel_tests": 1,
+            "auto_update_subscriptions": True,
+            "save_history": True,
+            "retention_days": config.benchmark.retention_days,
+            "ipv6": False,
+        }
+        row = connection.execute("SELECT value FROM app_meta WHERE key = 'settings'").fetchone()
+        if not row:
+            return defaults
+        try:
+            stored = json.loads(row["value"])
+        except (TypeError, json.JSONDecodeError):
+            stored = {}
+        if not isinstance(stored, dict):
+            stored = {}
+        defaults.update({key: stored[key] for key in defaults if key in stored})
+        return defaults
 
     def require_auth(vpn_bench_session: str | None = Cookie(default=None)) -> str:
         if not vpn_bench_session:
@@ -186,6 +214,20 @@ def build_app(config: Config) -> FastAPI:
     @app.get("/api/v1/auth/me")
     def me(_: str = Depends(require_auth)) -> dict:
         return {"authenticated": True, "role": "admin"}
+
+    @app.get("/api/v1/settings")
+    def get_settings(_: str = Depends(require_auth)) -> dict:
+        with db() as connection:
+            settings = load_settings(connection)
+        return settings | {"version": config.app.version}
+
+    @app.put("/api/v1/settings")
+    def update_settings(payload: SettingsRequest, _: str = Depends(require_auth)) -> dict:
+        values = payload.model_dump()
+        with db() as connection:
+            set_meta(connection, "settings", json.dumps(values, ensure_ascii=False))
+        write_log("INFO", "Настройки обновлены", values)
+        return values | {"version": config.app.version}
 
     @app.get("/api/v1/providers")
     def providers(_: str = Depends(require_auth)) -> list[dict]:
