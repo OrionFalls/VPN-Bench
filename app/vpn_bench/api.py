@@ -255,12 +255,24 @@ def build_app(config: Config) -> FastAPI:
         except SubscriptionError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-        provider_name = provider["name"]
-        if not provider_name or provider_name == "Определяется":
-            from urllib.parse import urlsplit
-            provider_name = urlsplit(url).hostname or "Provider"
-
+        from urllib.parse import urlsplit
         metadata = _subscription_metadata(headers)
+        provider_name = metadata.get("profile-title") or provider["name"] or urlsplit(url).hostname or "Provider"
+        if not provider_name or provider_name == "Определяется":
+            provider_name = urlsplit(url).hostname or "Provider"
+        metadata["server_count"] = len(imported)
+        metadata["protocols"] = sorted({str(item.protocol) for item in imported if item.protocol})
+        metadata["countries"] = sorted({country for country in (_country_code_from_name(item.name) for item in imported) if country})
+        if metadata.get("total") is not None:
+            used = int(metadata.get("upload") or 0) + int(metadata.get("download") or 0)
+            metadata["used"] = used
+            metadata["remaining"] = max(0, int(metadata["total"]) - used)
+            metadata["used_percent"] = round(used / int(metadata["total"]) * 100, 1) if int(metadata["total"]) else 0
+        if metadata.get("expire"):
+            try:
+                metadata["expire_at"] = datetime.fromtimestamp(int(metadata["expire"]), timezone.utc).isoformat()
+            except (TypeError, ValueError, OSError):
+                pass
         now = utc_now()
         with db() as connection:
             connection.execute(
@@ -305,6 +317,7 @@ def build_app(config: Config) -> FastAPI:
                 "UPDATE providers SET name = ?, metadata_json = ?, last_updated_at = ? WHERE id = ?",
                 (provider_name, json.dumps(metadata, ensure_ascii=False), now, provider_id),
             )
+        write_log("INFO", "Подписка провайдера обновлена", {"provider_id": provider_id, "servers": len(imported)})
         return {
             "provider_id": provider_id,
             "name": provider_name,
@@ -715,6 +728,13 @@ def build_app(config: Config) -> FastAPI:
         return [dict(r) | {"context": json_loads(r["context_json"])} for r in rows]
 
     return app
+
+
+def _country_code_from_name(name: str) -> str:
+    match = re.match(r"^\s*([\U0001F1E6-\U0001F1FF]{2})", str(name or ""))
+    if not match:
+        return ""
+    return "".join(chr(ord(ch) - 127397) for ch in match.group(1))
 
 
 def _subscription_metadata(headers: dict[str, str]) -> dict:
