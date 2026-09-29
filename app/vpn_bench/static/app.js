@@ -80,7 +80,17 @@ async function revealProviderUrl(id){
   if(!id)return;
   try{var r=await api("/api/v1/providers/"+id+"/subscription-url");var el=document.getElementById("pu");if(el){el.type="text";el.value=r.subscription_url;}}catch(e){alert(e.message)}
 }
-async function saveProvider(id){var name=document.getElementById("pn").value.trim(),url=document.getElementById("pu").value.trim();if(!url)return alert("Укажите URL подписки");try{var body={name:name,display_name:name||null,subscription_url:url,enabled:true};var p=await api(id?"/api/v1/providers/"+id:"/api/v1/providers",{method:id?"PUT":"POST",body:JSON.stringify(body)});await api("/api/v1/providers/"+p.id+"/sync",{method:"POST"});await refresh();state.page="providers";render()}catch(e){alert(e.message)}}
+async function saveProvider(id){
+  var name=document.getElementById("pn").value.trim(),url=document.getElementById("pu").value.trim();
+  try{
+    if(!url&&id){var revealed=await api("/api/v1/providers/"+id+"/subscription-url");url=revealed.subscription_url}
+    if(!url)return alert("Укажите URL подписки");
+    var body={name:name,display_name:name||null,subscription_url:url,enabled:true};
+    var p=await api(id?"/api/v1/providers/"+id:"/api/v1/providers",{method:id?"PUT":"POST",body:JSON.stringify(body)});
+    await api("/api/v1/providers/"+p.id+"/sync",{method:"POST"});
+    await refresh();state.page="providers";render();
+  }catch(e){alert(e.message)}
+}
 function editProvider(id){providerForm(id)}
 async function syncProvider(id){try{var r=await api("/api/v1/providers/"+id+"/sync",{method:"POST"});await refresh();render();alert("Импортировано серверов: "+r.servers)}catch(e){alert(e.message)}}
 function countryOf(s){
