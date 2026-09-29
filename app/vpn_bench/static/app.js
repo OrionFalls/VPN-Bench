@@ -1,4 +1,4 @@
-var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null,analyticsMetric:"speed",analyticsPeriod:"24h",analyticsSelected:[],screeningEnabled:false};
+var state={page:"dashboard",servers:[],providers:[],selected:{},mode:"equal_time",duration:600,filters:[""],serverFilters:{provider:"",country:"",protocol:"",status:"",search:""},screening:null,screeningFirst:30,screeningSecond:30,screeningRepeats:2,screeningMax:"",serverDetail:null,serverDetailTab:"overview",analyticsMetric:"speed",analyticsPeriod:"24h",analyticsSelected:[],screeningEnabled:false};
 var app=document.getElementById("app");
 
 function esc(v){return String(v==null?"":v).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]})}
@@ -187,7 +187,7 @@ function serverDetail(){
 function setAnalyticsMetric(metric){state.analyticsMetric=metric;render()}
 async function analytics(){
   var metric=state.analyticsMetric,period=state.analyticsPeriod,labels={speed:"Скорость",latency:"Задержка",loss:"Потери пакетов",availability:"Доступность",sites:"Сайты"};
-  var rows=await api("/api/v1/analytics")||[];
+  var rows=await api("/api/v1/analytics?period="+encodeURIComponent(period))||[];
   var selected=state.analyticsSelected.filter(function(id){return rows.some(function(r){return r.id===id})}).slice(0,5);state.analyticsSelected=selected;
   function value(r){if(metric==="speed")return {a:r.download_mbps,b:r.upload_mbps,unit:"Мбит/с",second:"Upload"};if(metric==="latency")return {a:r.latency_ms,b:r.jitter_ms,unit:"ms",second:"Jitter"};if(metric==="loss")return {a:r.packet_loss_percent,b:null,unit:"%",second:""};if(metric==="availability")return {a:r.availability,b:null,unit:"%",second:""};return {a:r.samples,b:null,unit:"проверок",second:""}}
   var options=rows.map(function(r){return '<option value="'+esc(r.id)+'" '+(selected.indexOf(r.id)>=0?"selected":"")+'>'+esc(r.provider)+" · "+esc(r.name)+'</option>'}).join("");
@@ -197,7 +197,7 @@ async function analytics(){
   var cards=selected.map(function(id){var r=rows.find(function(x){return x.id===id})||{},v=value(r);return '<div class="compare-metric"><b>'+esc(r.name||"—")+'</b><div class="compare-value"><span>'+labels[metric]+'</span><strong>'+num(v.a,1)+(v.unit?" "+v.unit:"")+'</strong></div>'+(v.b!=null?'<div class="compare-value"><span>'+esc(v.second)+'</span><strong>'+num(v.b,1)+' ms</strong></div>':"")+'</div>'}).join("");
   var table=selected.map(function(id){var r=rows.find(function(x){return x.id===id})||{};return '<tr><td>'+esc(r.provider)+'</td><td>'+esc(r.name)+'</td><td>'+num(r.download_mbps,0)+'</td><td>'+num(r.upload_mbps,0)+'</td><td>'+num(r.latency_ms,1)+'</td><td>'+num(r.jitter_ms,1)+'</td><td>'+num(r.packet_loss_percent,2)+'</td><td>'+num(r.availability,1)+'%</td></tr>'}).join("");
   var tabs=Object.keys(labels).map(function(k){return '<button class="'+(metric===k?"active":"")+'" onclick="setAnalyticsMetric(&quot;'+k+'&quot;)">'+labels[k]+'</button>'}).join("");
-  app.innerHTML=head("Графики / Сравнение","История показателей и сопоставление серверов")+
+  app.innerHTML=head("Сравнение","Сопоставление показателей и истории серверов")+
   '<section class="card analytics-card"><div class="analytics-toolbar"><label>Метрика<select class="input" onchange="setAnalyticsMetric(this.value)">'+Object.keys(labels).map(function(k){return '<option value="'+k+'" '+(metric===k?"selected":"")+'>'+labels[k]+'</option>'}).join("")+'</select></label><label>Период<select class="input" onchange="state.analyticsPeriod=this.value;render()"><option value="24h" '+(period==="24h"?"selected":"")+' >24 часа</option><option value="7d" '+(period==="7d"?"selected":"")+' >7 дней</option><option value="30d" '+(period==="30d"?"selected":"")+' >30 дней</option></select></label><label>Серверы <select class="input" multiple size="1" onchange="state.analyticsSelected=Array.from(this.selectedOptions).map(function(o){return o.value}).slice(0,5);render()">'+options+'</select></label></div><div class="analytics-tabs">'+tabs+'</div>'+
   '<div class="chart-placeholder"><div class="placeholder-grid"></div><div class="metric-bars">'+(bars||'<div class="empty">Недостаточно данных для графика</div>')+'</div></div>'+
   '<div class="compare-grid">'+(cards||'<div class="empty-chip">Выберите до 5 серверов для сравнения</div>')+'</div>'+
