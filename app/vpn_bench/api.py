@@ -637,6 +637,9 @@ def build_app(config: Config) -> FastAPI:
         def save_result(server_id: str, pass_no: int, result: dict) -> None:
             with db() as connection:
                 import json
+                current_settings = load_settings(connection)
+                if not current_settings["save_history"]:
+                    return
                 connection.execute(
                     "INSERT INTO screening_results(run_id,server_id,pass_no,started_at,duration_seconds,success,"
                     "latency_ms,jitter_ms,packet_loss_percent,dns_ok,http_ok,whitelist_ok,details_json) "
@@ -653,6 +656,7 @@ def build_app(config: Config) -> FastAPI:
                         ),
                         json.dumps(result.get("details", {}), ensure_ascii=False),
                     ),
+                prune_history(connection, current_settings["retention_days"])
                 )
 
         def finish(state, samples) -> None:
