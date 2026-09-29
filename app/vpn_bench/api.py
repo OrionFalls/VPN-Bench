@@ -537,8 +537,8 @@ def build_app(config: Config) -> FastAPI:
                             else None,
                             json.dumps(result["details"], ensure_ascii=False),
                         ),
-                    prune_history(connection, current_settings["retention_days"])
                     )
+                    prune_history(connection, current_settings["retention_days"])
 
             return worker.run_server(
                 server_data[server_id],
