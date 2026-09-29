@@ -30,7 +30,7 @@ HTML = f"""<!doctype html>
       <button data-page="providers"><span class="nav-icon">{ICON_PROVIDERS}</span><span>Провайдеры</span></button>
       <button data-page="servers"><span class="nav-icon">{ICON_SERVERS}</span><span>Серверы</span></button>
       <button data-page="tests"><span class="nav-icon">{ICON_TESTS}</span><span>Тесты</span></button>
-      <button data-page="analytics"><span class="nav-icon">{ICON_ANALYTICS}</span><span>Графики</span></button>
+      <button data-page="analytics"><span class="nav-icon">{ICON_ANALYTICS}</span><span>Сравнение</span></button>
       <button data-page="logs"><span class="nav-icon">{ICON_LOGS}</span><span>Логи</span></button>
       <button data-page="settings"><span class="nav-icon">{ICON_SETTINGS}</span><span>Настройки</span></button>
     </nav>
