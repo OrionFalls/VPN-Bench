@@ -77,8 +77,8 @@ function tests(){
     var ss=state.servers.filter(function(s){return s.provider_id===p.id||s.provider===p.name});
     if(!ss.length)return "";
     var all=ss.every(function(s){return state.selected[s.id]});
-    var ch='<div class="providerline"><label class="provider-check"><input type="checkbox" '+(all?"checked":"")+' onchange="toggleProvider(\\''+p.id+'\\',this.checked)"> <b>'+esc(p.display_name||p.name)+'</b><span class="muted">'+ss.length+' серверов</span></label></div>';
-    ss.forEach(function(s){ch+='<label class="serverline"><input type="checkbox" '+(state.selected[s.id]?"checked":"")+' onchange="toggle(\\''+s.id+'\\',this.checked)"> '+flag(s.name)+' <span>'+esc(s.name)+'</span><small>'+esc(s.protocol||"—")+'</small></label>'});
+    var ch='<div class="providerline"><label class="provider-check"><input type="checkbox" '+(all?"checked":"")+' onchange="toggleProvider(&quot;'+p.id+'&quot;,this.checked)"> <b>'+esc(p.display_name||p.name)+'</b><span class="muted">'+ss.length+' серверов</span></label></div>';
+    ss.forEach(function(s){ch+='<label class="serverline"><input type="checkbox" '+(state.selected[s.id]?"checked":"")+' onchange="toggle(&quot;'+s.id+'&quot;,this.checked)"> '+flag(s.name)+' <span>'+esc(s.name)+'</span><small>'+esc(s.protocol||"—")+'</small></label>'});
     return ch;
   }).join("");
   app.innerHTML = head("Тестирование","Управление процессом тестирования серверов",'<button class="btn" onclick="startTest()">Запустить тест</button>') +
