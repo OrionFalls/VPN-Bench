@@ -127,7 +127,7 @@ function providerForm(id){
   app.innerHTML=head(p?"Редактировать провайдера":"Добавить провайдера","Настройка подписки")+
   '<section class="card form-card"><div class="form-grid"><label>Название <span class="optional">необязательно</span><input id="pn" class="input" value="'+name+'" placeholder="Оставьте пустым — определится автоматически"></label><div class="field-help">Если поле пустое, VPN-Bench получит название из метаданных подписки или адреса сервера.</div><label>URL подписки <span>*</span><div class="input-with-action"><input id="pu" class="input" type="password" value="" placeholder="'+(p?(p.subscription_url_masked||"••••"):"https://example.com/sub")+'"><button class="icon-btn" onclick="revealProviderUrl(&quot;'+(p?p.id:"")+'&quot;)" title="Показать текущий URL">'+icon("eye")+'</button></div></label></div><div class="form-actions"><button class="btn secondary" onclick="state.page=\'providers\';render()">Отмена</button><button class="btn" onclick="saveProvider(&quot;'+(p?p.id:"")+'&quot;)">Сохранить</button></div></section>'
 }
-async function revealProviderUrl(id){if(!id)return;try{var r=await api("/api/v1/providers/"+id+"/subscription-url"),el=document.getElementById("pu");if(el){el.type="text";el.value=r.subscription_url}}catch(e){alert(e.message)}}
+async function revealProviderUrl(id){if(!id)return;try{var r=await api("/api/v1/providers/"+id+"/subscription-url"),el=document.getElementById("pu");if(el){el.type="text";el.value=r.subscription_url}}catch(e){showToast(e.message,"error")}}
 async function saveProvider(id){
   var name=document.getElementById("pn").value.trim(),url=document.getElementById("pu").value.trim();
   try{
