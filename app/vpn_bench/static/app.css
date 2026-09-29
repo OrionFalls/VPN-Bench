@@ -39,3 +39,5 @@
 .settings-layout{display:block}.settings-nav{display:none}.settings-content{width:100%;max-width:1000px}
 
 .protocol-main{display:block}.protocol-sub{display:block;margin-top:2px;color:#718096;font-size:8px;font-weight:600}.security-sub{display:block;margin-top:1px;color:#a0aaba;font-size:8px;font-weight:500}.server-table td[data-col="protocol"]{vertical-align:middle}
+
+.nav button,.btn,.icon-btn,.card,.input,.serverline,.kpi{transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease}.btn:active,.icon-btn:active{transform:translateY(1px)}.card:hover{box-shadow:0 8px 18px rgba(29,50,82,.07)}
