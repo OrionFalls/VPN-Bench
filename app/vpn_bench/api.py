@@ -656,8 +656,8 @@ def build_app(config: Config) -> FastAPI:
                         ),
                         json.dumps(result.get("details", {}), ensure_ascii=False),
                     ),
-                prune_history(connection, current_settings["retention_days"])
                 )
+                prune_history(connection, current_settings["retention_days"])
 
         def finish(state, samples) -> None:
             with db() as connection:
