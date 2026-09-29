@@ -34,7 +34,7 @@ HTML = f"""<!doctype html>
       <button data-page="logs"><span class="nav-icon">{ICON_LOGS}</span><span>Логи</span></button>
       <button data-page="settings"><span class="nav-icon">{ICON_SETTINGS}</span><span>Настройки</span></button>
     </nav>
-    <div class="bottom">v0.2.0</div>
+    <div class="bottom" id="app-version"></div>
   </aside>
   <main class="main"><div id="app"></div></main>
 </div>
